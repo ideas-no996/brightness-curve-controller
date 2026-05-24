@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">亮度曲线控制器</string>
+    <string name="notification_channel_name">亮度曲线控制</string>
+    <string name="notification_title">正在接管系统亮度</string>
+    <string name="notification_text">根据个人曲线和环境光调整亮度</string>
+    <string name="fgs_subtype">Personal adaptive brightness controller</string>
+</resources>

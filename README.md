@@ -1,0 +1,152 @@
+# Brightness Curve Controller
+
+一个非 root Android 亮度曲线控制器。它读取环境光传感器的 lux，根据个人化亮度曲线写入系统屏幕亮度，让亮度调节更接近“我现在看着舒服”，而不是只依赖系统默认自动亮度。
+
+> 当前项目仍处于早期阶段，已经可以在 OPPO/ColorOS 平板上读取环境光并写入系统亮度。欢迎测试、反馈和改进。
+
+## 功能特性
+
+- 非 root 控制系统亮度，使用 Android `WRITE_SETTINGS` 能力。
+- 前台服务持续读取 `TYPE_LIGHT` 环境光传感器。
+- 使用 log lux 曲线映射环境光和亮度百分比。
+- 支持预设曲线、自定义曲线、快速校准和历史版本回滚。
+- 首页以日常使用为主：环境判断、当前感觉、太暗/刚好/太亮快速反馈。
+- 调试信息默认折叠，保留 raw lux、平滑 lux、目标亮度、写入亮度。
+- 响应策略包含 EMA 平滑、写入节流、死区和亮度渐变，避免频繁跳变。
+- 包含 adaptive launcher icon。
+
+## 适用设备
+
+理论上适用于 Android 8.0+，但不同厂商对系统亮度、后台服务和传感器的限制不同。
+
+已验证环境：
+
+- OPPO/ColorOS 平板
+- Android 设备已开启 USB 调试
+- 用户已手动授予“修改系统设置”权限
+
+## 权限说明
+
+本项目不需要 root，但需要用户手动授予：
+
+- `WRITE_SETTINGS`：写入 `Settings.System.SCREEN_BRIGHTNESS`
+- `POST_NOTIFICATIONS`：Android 13+ 显示前台服务通知
+- `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE`：后台持续亮度控制
+- `RECEIVE_BOOT_COMPLETED`：可选，开机后恢复控制
+
+启用控制器后，App 会把系统亮度模式切换到手动模式，并由前台服务持续调整亮度。停止服务时会尝试恢复启用前的亮度模式和亮度值。
+
+## 快速开始
+
+### 1. Clone
+
+```bash
+git clone https://github.com/ideas-no996/brightness-curve-controller.git
+cd brightness-curve-controller
+```
+
+### 2. 用 Android Studio 打开
+
+用 Android Studio 打开项目根目录，等待 Gradle Sync 完成，然后连接 Android 设备运行 `app`。
+
+首次启动后：
+
+1. 授予“修改系统设置”权限。
+2. Android 13+ 允许前台服务通知。
+3. 回到 App，打开首页开关。
+
+### 3. 命令行构建
+
+Windows PowerShell：
+
+```powershell
+.\gradlew.bat testDebugUnitTest assembleDebug
+```
+
+macOS / Linux：
+
+```bash
+./gradlew testDebugUnitTest assembleDebug
+```
+
+生成的 debug APK：
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+## USB 安装调试
+
+Windows PowerShell：
+
+```powershell
+$env:ANDROID_HOME = "C:\Program\Android\sdk"
+$env:PATH = "$env:ANDROID_HOME\platform-tools;$env:PATH"
+
+adb devices -l
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+adb shell monkey -p com.evan.brightnesscurve 1
+```
+
+确认服务和传感器：
+
+```powershell
+adb shell dumpsys sensorservice | Select-String "com.evan.brightnesscurve|Ambient Light|samplingPeriod"
+adb shell dumpsys activity services com.evan.brightnesscurve | Select-String "BrightnessControlService|isForeground"
+```
+
+查看崩溃日志：
+
+```powershell
+adb logcat -d -t 500 | Select-String "AndroidRuntime|FATAL EXCEPTION|com.evan.brightnesscurve"
+```
+
+## 项目结构
+
+```text
+app/src/main/java/com/evan/brightnesscurve/
+  brightness/   系统亮度读写、曲线映射、渐变策略、权限检查
+  sensor/       环境光传感器监听和 lux 平滑
+  data/         Room、DataStore、预设、校准数据
+  service/      前台服务、开机启动、运行时状态
+  ui/           Compose 页面、主题、ViewModel
+  domain/       兼容旧测试的领域封装
+```
+
+## 开发脚本
+
+本仓库保留了本机辅助脚本：
+
+```powershell
+.\scripts\test-and-build.ps1
+.\scripts\install-debug.ps1
+```
+
+这些脚本包含本机 Android SDK/JDK 路径，仅作为 Windows 本机开发便利入口。通用构建请优先使用 Gradle Wrapper：
+
+```powershell
+.\gradlew.bat testDebugUnitTest assembleDebug
+```
+
+## 开源路线图
+
+- 增加更多设备兼容性测试。
+- 增加导入/导出亮度曲线。
+- 增加可视化曲线编辑体验。
+- 增加更明确的首次启动引导。
+- 增加 Release APK 自动构建。
+- 根据真实使用反馈优化亮度响应策略。
+
+## 贡献
+
+欢迎提交 issue、讨论设备兼容性、亮度曲线体验和 UI 改进。提交代码前请先运行：
+
+```bash
+./gradlew testDebugUnitTest assembleDebug
+```
+
+详细说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 许可证
+
+本项目使用 MIT License，见 [LICENSE](LICENSE)。
