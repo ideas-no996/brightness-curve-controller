@@ -4,3 +4,8 @@
 build/
 local.properties
 *.iml
+*.jks
+*.keystore
+release-keystore.jks
+release-signing.properties
+release-signing/

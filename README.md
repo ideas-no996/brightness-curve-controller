@@ -101,6 +101,40 @@ adb shell dumpsys activity services com.evan.brightnesscurve | Select-String "Br
 adb logcat -d -t 500 | Select-String "AndroidRuntime|FATAL EXCEPTION|com.evan.brightnesscurve"
 ```
 
+## 发布 Release APK
+
+普通 push 和 pull request 会运行 debug 构建验证。推送符合 `v*.*.*` 格式的 tag 时，GitHub Actions 会构建 release APK，使用仓库 Secrets 中的签名信息签名，并上传到 GitHub Release。
+
+需要先在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中添加：
+
+```text
+ANDROID_KEYSTORE_BASE64
+ANDROID_KEYSTORE_PASSWORD
+ANDROID_KEY_ALIAS
+ANDROID_KEY_PASSWORD
+```
+
+`ANDROID_KEYSTORE_BASE64` 是 release keystore 文件的 Base64 内容。Windows PowerShell 生成方式示例：
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\release.keystore")) | Set-Clipboard
+```
+
+发布第一个版本示例：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+生成的 Release asset 文件名类似：
+
+```text
+BrightnessCurveController-1.0.0.apk
+```
+
+不要提交 keystore、密码、alias 或本地 signing 配置文件。
+
 ## 项目结构
 
 ```text
