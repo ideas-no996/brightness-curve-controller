@@ -37,7 +37,9 @@ data class MainUiState(
         lastComfortPercent = 20f,
         minAllowedPercent = 3f,
         maxAllowedPercent = 100f,
-        responseSpeed = ResponseSpeed.Standard
+        responseSpeed = ResponseSpeed.Standard,
+        hasSeenTutorial = false,
+        showTutorialOnStartup = true
     ),
     val canWriteSettings: Boolean = false,
     val message: String? = null
@@ -153,6 +155,14 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
 
     fun setResponseSpeed(speed: ResponseSpeed) {
         viewModelScope.launch { app.preferencesRepository.setResponseSpeed(speed) }
+    }
+
+    fun setShowTutorialOnStartup(enabled: Boolean) {
+        viewModelScope.launch { app.preferencesRepository.setShowTutorialOnStartup(enabled) }
+    }
+
+    fun finishTutorial(showOnStartup: Boolean) {
+        viewModelScope.launch { app.preferencesRepository.finishTutorial(showOnStartup) }
     }
 
     fun quickCalibrate(deltaPercent: Float) {

@@ -22,7 +22,9 @@ data class AppSettings(
     val lastComfortPercent: Float,
     val minAllowedPercent: Float,
     val maxAllowedPercent: Float,
-    val responseSpeed: ResponseSpeed
+    val responseSpeed: ResponseSpeed,
+    val hasSeenTutorial: Boolean,
+    val showTutorialOnStartup: Boolean
 )
 
 data class OriginalBrightnessSettings(
@@ -40,6 +42,8 @@ class AppPreferencesRepository(private val context: Context) {
         val MinAllowedPercent = floatPreferencesKey("min_allowed_percent")
         val MaxAllowedPercent = floatPreferencesKey("max_allowed_percent")
         val ResponseSpeed = stringPreferencesKey("response_speed")
+        val HasSeenTutorial = booleanPreferencesKey("has_seen_tutorial")
+        val ShowTutorialOnStartup = booleanPreferencesKey("show_tutorial_on_startup")
         val OriginalMode = intPreferencesKey("original_mode")
         val OriginalBrightness = intPreferencesKey("original_brightness")
     }
@@ -53,7 +57,9 @@ class AppPreferencesRepository(private val context: Context) {
             lastComfortPercent = prefs[Keys.LastComfortPercent] ?: 20f,
             minAllowedPercent = prefs[Keys.MinAllowedPercent] ?: 3f,
             maxAllowedPercent = prefs[Keys.MaxAllowedPercent] ?: 100f,
-            responseSpeed = ResponseSpeed.fromStored(prefs[Keys.ResponseSpeed])
+            responseSpeed = ResponseSpeed.fromStored(prefs[Keys.ResponseSpeed]),
+            hasSeenTutorial = prefs[Keys.HasSeenTutorial] ?: false,
+            showTutorialOnStartup = prefs[Keys.ShowTutorialOnStartup] ?: true
         )
     }
 
@@ -97,6 +103,20 @@ class AppPreferencesRepository(private val context: Context) {
 
     suspend fun setResponseSpeed(speed: ResponseSpeed) {
         context.brightnessDataStore.edit { it[Keys.ResponseSpeed] = speed.name }
+    }
+
+    suspend fun setShowTutorialOnStartup(enabled: Boolean) {
+        context.brightnessDataStore.edit { prefs ->
+            prefs[Keys.ShowTutorialOnStartup] = enabled
+            if (enabled) prefs[Keys.HasSeenTutorial] = true
+        }
+    }
+
+    suspend fun finishTutorial(showOnStartup: Boolean) {
+        context.brightnessDataStore.edit { prefs ->
+            prefs[Keys.HasSeenTutorial] = true
+            prefs[Keys.ShowTutorialOnStartup] = showOnStartup
+        }
     }
 
     suspend fun saveOriginalSettings(mode: Int, brightness: Int) {

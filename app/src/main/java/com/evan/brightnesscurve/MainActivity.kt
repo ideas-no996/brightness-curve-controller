@@ -76,6 +76,8 @@ class MainActivity : ComponentActivity() {
                     onMinAllowedChange = viewModel::setMinAllowedPercent,
                     onMaxAllowedChange = viewModel::setMaxAllowedPercent,
                     onResponseSpeedChange = viewModel::setResponseSpeed,
+                    onTutorialStartupChange = viewModel::setShowTutorialOnStartup,
+                    onFinishTutorial = viewModel::finishTutorial,
                     onQuickCalibrate = viewModel::quickCalibrate,
                     onCalibrate = viewModel::calibrateCurrentEnvironment,
                     onActivatePreset = viewModel::activatePreset,

@@ -69,6 +69,8 @@ fun MainScreen(
     onMinAllowedChange: (Float) -> Unit,
     onMaxAllowedChange: (Float) -> Unit,
     onResponseSpeedChange: (ResponseSpeed) -> Unit,
+    onTutorialStartupChange: (Boolean) -> Unit,
+    onFinishTutorial: (Boolean) -> Unit,
     onQuickCalibrate: (Float) -> Unit,
     onCalibrate: () -> Unit,
     onActivatePreset: (Long) -> Unit,
@@ -83,11 +85,20 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var tutorialVisible by rememberSaveable { mutableStateOf(false) }
+    var tutorialAutoChecked by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         scope.launch { snackbarHostState.showSnackbar(message) }
         onDismissMessage()
+    }
+
+    LaunchedEffect(state.settings.hasSeenTutorial, state.settings.showTutorialOnStartup) {
+        if (!tutorialAutoChecked) {
+            tutorialAutoChecked = true
+            tutorialVisible = state.settings.showTutorialOnStartup || !state.settings.hasSeenTutorial
+        }
     }
 
     Scaffold(
@@ -147,9 +158,24 @@ fun MainScreen(
                 onToggleOutdoorFull = onToggleOutdoorFull,
                 onMinAllowedChange = onMinAllowedChange,
                 onMaxAllowedChange = onMaxAllowedChange,
-                onResponseSpeedChange = onResponseSpeedChange
+                onResponseSpeedChange = onResponseSpeedChange,
+                onTutorialStartupChange = onTutorialStartupChange,
+                onReviewTutorial = { tutorialVisible = true }
             )
         }
+    }
+
+    if (tutorialVisible) {
+        TutorialOverlay(
+            onSkip = {
+                tutorialVisible = false
+                onFinishTutorial(false)
+            },
+            onFinish = { showOnStartup ->
+                tutorialVisible = false
+                onFinishTutorial(showOnStartup)
+            }
+        )
     }
 }
 
@@ -266,7 +292,9 @@ private fun SettingsTab(
     onToggleOutdoorFull: (Boolean) -> Unit,
     onMinAllowedChange: (Float) -> Unit,
     onMaxAllowedChange: (Float) -> Unit,
-    onResponseSpeedChange: (ResponseSpeed) -> Unit
+    onResponseSpeedChange: (ResponseSpeed) -> Unit,
+    onTutorialStartupChange: (Boolean) -> Unit,
+    onReviewTutorial: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -324,6 +352,22 @@ private fun SettingsTab(
                     }
                     SettingSwitchRow("开机后自动恢复控制", state.settings.startOnBoot, onToggleStartOnBoot)
                     SettingSwitchRow("室外允许拉到满亮", state.settings.allowOutdoorFull, onToggleOutdoorFull)
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("教程", style = MaterialTheme.typography.titleMedium)
+                    SettingSwitchRow(
+                        "启动时显示教程",
+                        state.settings.showTutorialOnStartup,
+                        onTutorialStartupChange
+                    )
+                    OutlinedButton(onClick = onReviewTutorial, modifier = Modifier.fillMaxWidth()) {
+                        Text("重新查看教程")
+                    }
                 }
             }
         }
@@ -550,6 +594,83 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onCheckedChange: (
 }
 
 @Composable
+private fun TutorialOverlay(
+    onSkip: () -> Unit,
+    onFinish: (Boolean) -> Unit
+) {
+    val steps = remember {
+        listOf(
+            TutorialStep(
+                title = "跟着光线走",
+                body = "环境变亮或变暗时，我会帮你调整屏幕亮度。"
+            ),
+            TutorialStep(
+                title = "告诉我你的感觉",
+                body = "觉得太暗、刚刚好或太亮，点一下就能校准。"
+            ),
+            TutorialStep(
+                title = "慢慢变成你的曲线",
+                body = "每次校准都会让亮度更贴近你的习惯。"
+            ),
+            TutorialStep(
+                title = "随时交还给你",
+                body = "你可以关掉自动控制，也能在设置里重看教程。"
+            )
+        )
+    }
+    var stepIndex by rememberSaveable { mutableIntStateOf(0) }
+    val step = steps[stepIndex]
+    val isLastStep = stepIndex == steps.lastIndex
+
+    AlertDialog(
+        onDismissRequest = onSkip,
+        title = { Text(step.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(step.body)
+                Text(
+                    text = "第 ${stepIndex + 1} / ${steps.size} 步",
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            if (isLastStep) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { onFinish(true) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("以后每次打开都显示")
+                    }
+                    OutlinedButton(
+                        onClick = { onFinish(false) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("以后不再自动显示")
+                    }
+                }
+            } else {
+                Button(onClick = { stepIndex += 1 }) {
+                    Text("下一步")
+                }
+            }
+        },
+        dismissButton = {
+            if (!isLastStep) {
+                TextButton(onClick = onSkip) {
+                    Text("跳过")
+                }
+            }
+        }
+    )
+}
+
+@Composable
 private fun MetricRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label)
@@ -636,6 +757,11 @@ private fun RenameDialog(
 private data class DraftPoint(
     val luxText: String,
     val brightnessPercent: Float
+)
+
+private data class TutorialStep(
+    val title: String,
+    val body: String
 )
 
 private fun formatTime(value: Long): String =
