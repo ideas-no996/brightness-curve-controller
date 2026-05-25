@@ -80,7 +80,7 @@ app/build/outputs/apk/debug/app-debug.apk
 Windows PowerShell：
 
 ```powershell
-$env:ANDROID_HOME = "C:\Program\Android\sdk"
+$env:ANDROID_HOME = "C:\DevTools\Android\sdk"
 $env:PATH = "$env:ANDROID_HOME\platform-tools;$env:PATH"
 
 adb devices -l
@@ -134,6 +134,8 @@ BrightnessCurveController-1.0.0.apk
 ```
 
 不要提交 keystore、密码、alias 或本地 signing 配置文件。
+
+更详细的一步一步说明见 [docs/RELEASE.md](docs/RELEASE.md)。
 
 ## 项目结构
 
