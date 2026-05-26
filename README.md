@@ -14,6 +14,7 @@
 - 调试信息默认折叠，保留 raw lux、平滑 lux、目标亮度、写入亮度。
 - 响应策略包含 EMA 平滑、写入节流、死区和亮度渐变，避免频繁跳变。
 - 包含 adaptive launcher icon。
+- 支持在 App 设置页检查 GitHub Release 更新、下载 APK，并调起系统安装确认页。
 
 ## 适用设备
 
@@ -33,8 +34,12 @@
 - `POST_NOTIFICATIONS`：Android 13+ 显示前台服务通知
 - `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE`：后台持续亮度控制
 - `RECEIVE_BOOT_COMPLETED`：可选，开机后恢复控制
+- `INTERNET`：检查 GitHub Release 是否有新版本，下载 APK
+- `REQUEST_INSTALL_PACKAGES`：用户确认后安装 App 下载的更新 APK
 
 启用控制器后，App 会把系统亮度模式切换到手动模式，并由前台服务持续调整亮度。停止服务时会尝试恢复启用前的亮度模式和亮度值。
+
+应用内更新不会静默安装 APK。Android 会要求用户允许“安装未知应用”，并在系统安装器里确认安装。
 
 ## 快速开始
 
@@ -133,6 +138,8 @@ git push origin v1.0.0
 BrightnessCurveController-1.0.0.apk
 ```
 
+App 设置页的“软件更新”会读取最新 GitHub Release，并查找这个命名格式的 APK。发布新版本时继续使用 `v*.*.*` tag，例如 `v1.0.1`。
+
 不要提交 keystore、密码、alias 或本地 signing 配置文件。
 
 更详细的一步一步说明见 [docs/RELEASE.md](docs/RELEASE.md)。
@@ -145,6 +152,7 @@ app/src/main/java/com/evan/brightnesscurve/
   sensor/       环境光传感器监听和 lux 平滑
   data/         Room、DataStore、预设、校准数据
   service/      前台服务、开机启动、运行时状态
+  update/       GitHub Release 检查、APK 下载、系统安装入口
   ui/           Compose 页面、主题、ViewModel
   domain/       兼容旧测试的领域封装
 ```
@@ -171,6 +179,7 @@ app/src/main/java/com/evan/brightnesscurve/
 - 增加可视化曲线编辑体验。
 - 增加更明确的首次启动引导。
 - 增加 Release APK 自动构建。
+- 增强应用内更新体验。
 - 根据真实使用反馈优化亮度响应策略。
 
 ## 贡献

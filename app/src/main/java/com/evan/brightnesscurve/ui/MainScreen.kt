@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -71,6 +72,11 @@ fun MainScreen(
     onResponseSpeedChange: (ResponseSpeed) -> Unit,
     onTutorialStartupChange: (Boolean) -> Unit,
     onFinishTutorial: (Boolean) -> Unit,
+    onCheckUpdate: () -> Unit,
+    onDownloadUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    onOpenInstallPermission: () -> Unit,
+    onRefreshInstallPermission: () -> Unit,
     onQuickCalibrate: (Float) -> Unit,
     onCalibrate: () -> Unit,
     onActivatePreset: (Long) -> Unit,
@@ -160,7 +166,12 @@ fun MainScreen(
                 onMaxAllowedChange = onMaxAllowedChange,
                 onResponseSpeedChange = onResponseSpeedChange,
                 onTutorialStartupChange = onTutorialStartupChange,
-                onReviewTutorial = { tutorialVisible = true }
+                onReviewTutorial = { tutorialVisible = true },
+                onCheckUpdate = onCheckUpdate,
+                onDownloadUpdate = onDownloadUpdate,
+                onInstallUpdate = onInstallUpdate,
+                onOpenInstallPermission = onOpenInstallPermission,
+                onRefreshInstallPermission = onRefreshInstallPermission
             )
         }
     }
@@ -294,7 +305,12 @@ private fun SettingsTab(
     onMaxAllowedChange: (Float) -> Unit,
     onResponseSpeedChange: (ResponseSpeed) -> Unit,
     onTutorialStartupChange: (Boolean) -> Unit,
-    onReviewTutorial: () -> Unit
+    onReviewTutorial: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    onDownloadUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    onOpenInstallPermission: () -> Unit,
+    onRefreshInstallPermission: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -352,6 +368,77 @@ private fun SettingsTab(
                     }
                     SettingSwitchRow("开机后自动恢复控制", state.settings.startOnBoot, onToggleStartOnBoot)
                     SettingSwitchRow("室外允许拉到满亮", state.settings.allowOutdoorFull, onToggleOutdoorFull)
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val update = state.updateState
+                    val latest = update.latest
+
+                    Text("软件更新", style = MaterialTheme.typography.titleMedium)
+                    MetricRow("当前版本", update.currentVersionName)
+                    MetricRow("更新状态", update.statusText)
+                    update.lastCheckedAt?.let {
+                        MetricRow("上次检查", formatTime(it))
+                    }
+
+                    if (latest != null) {
+                        MetricRow("最新版本", latest.versionName)
+                        MetricRow("发布时间", formatReleaseTime(latest.publishedAt))
+                        MetricRow("安装包", formatFileSize(latest.apkSizeBytes))
+                    }
+
+                    if (update.isDownloading) {
+                        LinearProgressIndicator(
+                            progress = {
+                                ((update.downloadProgressPercent ?: 0) / 100f).coerceIn(0f, 1f)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("正在下载：${update.downloadProgressPercent ?: 0}%")
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = onCheckUpdate,
+                            enabled = !update.isChecking && !update.isDownloading
+                        ) {
+                            Text(if (update.isChecking) "检查中" else "检查更新")
+                        }
+
+                        if (latest != null && !update.isDownloaded) {
+                            Button(
+                                onClick = onDownloadUpdate,
+                                enabled = !update.isChecking && !update.isDownloading
+                            ) {
+                                Text("下载")
+                            }
+                        }
+
+                        if (update.isDownloaded) {
+                            Button(
+                                onClick = onInstallUpdate,
+                                enabled = !update.isChecking && !update.isDownloading
+                            ) {
+                                Text("安装")
+                            }
+                        }
+                    }
+
+                    if (!update.canInstallPackages && latest != null) {
+                        Text("安装更新前，需要允许此 App 安装下载的 APK。")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = onOpenInstallPermission) {
+                                Text("允许安装来源")
+                            }
+                            TextButton(onClick = onRefreshInstallPermission) {
+                                Text("刷新")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -766,3 +853,16 @@ private data class TutorialStep(
 
 private fun formatTime(value: Long): String =
     SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(value))
+
+private fun formatReleaseTime(value: String?): String {
+    return value
+        ?.replace("T", " ")
+        ?.removeSuffix("Z")
+        ?: "未知"
+}
+
+private fun formatFileSize(value: Long): String {
+    if (value <= 0L) return "未知大小"
+    val mb = value / 1024f / 1024f
+    return "%.1f MB".format(mb)
+}

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.evan.brightnesscurve.BrightnessCurveApp
+import com.evan.brightnesscurve.BuildConfig
 import com.evan.brightnesscurve.data.AppSettings
 import com.evan.brightnesscurve.data.BrightnessPoint
 import com.evan.brightnesscurve.data.BrightnessPreset
@@ -14,6 +15,10 @@ import com.evan.brightnesscurve.service.BrightnessRuntimeState
 import com.evan.brightnesscurve.service.RuntimeSnapshot
 import com.evan.brightnesscurve.service.ServiceController
 import com.evan.brightnesscurve.system.BrightnessSettings
+import com.evan.brightnesscurve.update.AppUpdateState
+import com.evan.brightnesscurve.update.UpdateChecker
+import com.evan.brightnesscurve.update.UpdateDownloader
+import com.evan.brightnesscurve.update.UpdateInstaller
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,7 +26,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class MainUiState(
     val presets: List<BrightnessPreset> = emptyList(),
@@ -42,6 +49,10 @@ data class MainUiState(
         showTutorialOnStartup = true
     ),
     val canWriteSettings: Boolean = false,
+    val updateState: AppUpdateState = AppUpdateState(
+        currentVersionName = BuildConfig.VERSION_NAME,
+        canInstallPackages = true
+    ),
     val message: String? = null
 )
 
@@ -58,6 +69,14 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
     private val canWriteSettings = MutableStateFlow(BrightnessSettings.canWrite(app))
     private val selectedEditorPresetId = MutableStateFlow<Long?>(null)
     private val message = MutableStateFlow<String?>(null)
+    private val updateChecker = UpdateChecker()
+    private val updateDownloader = UpdateDownloader(app)
+    private val updateState = MutableStateFlow(
+        AppUpdateState(
+            currentVersionName = BuildConfig.VERSION_NAME,
+            canInstallPackages = UpdateInstaller.canRequestPackageInstalls(app)
+        )
+    )
 
     private val editorPreset = combine(
         app.presetRepository.observePresets(),
@@ -92,8 +111,9 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
         baseUiData,
         app.preferencesRepository.settings,
         canWriteSettings,
+        updateState,
         message
-    ) { base, settings, canWrite, message ->
+    ) { base, settings, canWrite, updateState, message ->
         MainUiState(
             presets = base.presets,
             activePreset = base.activePreset,
@@ -102,6 +122,7 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
             runtime = base.runtime,
             settings = settings,
             canWriteSettings = canWrite,
+            updateState = updateState,
             message = message
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
@@ -115,6 +136,134 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
 
     fun refreshWritePermission() {
         canWriteSettings.value = BrightnessSettings.canWrite(app)
+    }
+
+    fun refreshInstallPermission() {
+        updateState.update {
+            it.copy(canInstallPackages = UpdateInstaller.canRequestPackageInstalls(app))
+        }
+    }
+
+    fun checkForUpdate() {
+        if (updateState.value.isChecking) return
+
+        viewModelScope.launch {
+            updateState.update {
+                it.copy(
+                    isChecking = true,
+                    statusText = "正在检查更新",
+                    downloadedApkPath = null,
+                    downloadProgressPercent = null
+                )
+            }
+
+            runCatching {
+                updateChecker.checkLatest(BuildConfig.VERSION_NAME)
+            }.onSuccess { latest ->
+                updateState.update {
+                    if (latest == null) {
+                        it.copy(
+                            latest = null,
+                            isChecking = false,
+                            lastCheckedAt = System.currentTimeMillis(),
+                            statusText = "已是最新版本"
+                        )
+                    } else {
+                        it.copy(
+                            latest = latest,
+                            isChecking = false,
+                            lastCheckedAt = System.currentTimeMillis(),
+                            statusText = "发现新版本 ${latest.versionName}"
+                        )
+                    }
+                }
+            }.onFailure { throwable ->
+                val text = throwable.message ?: "暂时无法检查更新"
+                updateState.update {
+                    it.copy(
+                        isChecking = false,
+                        lastCheckedAt = System.currentTimeMillis(),
+                        statusText = text
+                    )
+                }
+                message.value = text
+            }
+        }
+    }
+
+    fun downloadLatestUpdate() {
+        if (updateState.value.isDownloading) return
+
+        val latest = updateState.value.latest
+        if (latest == null) {
+            message.value = "请先检查更新"
+            return
+        }
+
+        viewModelScope.launch {
+            updateState.update {
+                it.copy(
+                    isDownloading = true,
+                    downloadProgressPercent = 0,
+                    downloadedApkPath = null,
+                    statusText = "正在下载更新"
+                )
+            }
+
+            runCatching {
+                updateDownloader.download(latest) { progress ->
+                    updateState.update { current ->
+                        current.copy(downloadProgressPercent = progress)
+                    }
+                }
+            }.onSuccess { apkFile ->
+                updateState.update {
+                    it.copy(
+                        isDownloading = false,
+                        downloadProgressPercent = 100,
+                        downloadedApkPath = apkFile.absolutePath,
+                        statusText = "下载完成，可以安装"
+                    )
+                }
+            }.onFailure { throwable ->
+                val text = throwable.message ?: "下载更新失败"
+                updateState.update {
+                    it.copy(
+                        isDownloading = false,
+                        statusText = text
+                    )
+                }
+                message.value = text
+            }
+        }
+    }
+
+    fun installDownloadedUpdate(): Boolean {
+        val canInstall = UpdateInstaller.canRequestPackageInstalls(app)
+        updateState.update { it.copy(canInstallPackages = canInstall) }
+        if (!canInstall) {
+            message.value = "请先允许安装此来源的应用"
+            return false
+        }
+
+        val path = updateState.value.downloadedApkPath
+        if (path.isNullOrBlank()) {
+            message.value = "请先下载更新"
+            return false
+        }
+
+        val apkFile = File(path)
+        if (!apkFile.exists()) {
+            message.value = "安装包已失效，请重新下载"
+            updateState.update { it.copy(downloadedApkPath = null, statusText = "安装包已失效") }
+            return false
+        }
+
+        return runCatching {
+            UpdateInstaller.installApk(app, apkFile)
+        }.onFailure {
+            message.value = it.message ?: "无法打开系统安装器"
+        }.isSuccess
     }
 
     fun setServiceEnabled(enabled: Boolean) {

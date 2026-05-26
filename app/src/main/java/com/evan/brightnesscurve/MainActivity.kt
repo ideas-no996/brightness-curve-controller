@@ -20,6 +20,7 @@ import com.evan.brightnesscurve.ui.BrightnessAppTheme
 import com.evan.brightnesscurve.ui.MainScreen
 import com.evan.brightnesscurve.ui.MainViewModel
 import com.evan.brightnesscurve.ui.MainViewModelFactory
+import com.evan.brightnesscurve.update.UpdateInstaller
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
@@ -36,6 +37,11 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.StartActivityForResult()
             ) {
                 viewModel.refreshWritePermission()
+            }
+            val installPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) {
+                viewModel.refreshInstallPermission()
             }
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission()
@@ -78,6 +84,20 @@ class MainActivity : ComponentActivity() {
                     onResponseSpeedChange = viewModel::setResponseSpeed,
                     onTutorialStartupChange = viewModel::setShowTutorialOnStartup,
                     onFinishTutorial = viewModel::finishTutorial,
+                    onCheckUpdate = viewModel::checkForUpdate,
+                    onDownloadUpdate = viewModel::downloadLatestUpdate,
+                    onInstallUpdate = {
+                        if (!UpdateInstaller.canRequestPackageInstalls(context)) {
+                            viewModel.refreshInstallPermission()
+                            installPermissionLauncher.launch(UpdateInstaller.unknownAppSourcesIntent(context))
+                        } else {
+                            viewModel.installDownloadedUpdate()
+                        }
+                    },
+                    onOpenInstallPermission = {
+                        installPermissionLauncher.launch(UpdateInstaller.unknownAppSourcesIntent(context))
+                    },
+                    onRefreshInstallPermission = viewModel::refreshInstallPermission,
                     onQuickCalibrate = viewModel::quickCalibrate,
                     onCalibrate = viewModel::calibrateCurrentEnvironment,
                     onActivatePreset = viewModel::activatePreset,
@@ -96,5 +116,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshWritePermission()
+        viewModel.refreshInstallPermission()
     }
 }
