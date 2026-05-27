@@ -1,7 +1,4 @@
 package com.evan.brightnesscurve.ui
-
-import android.content.Context
-import android.hardware.SensorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -20,17 +17,14 @@ import com.evan.brightnesscurve.service.BrightnessRuntimeState
 import com.evan.brightnesscurve.service.RuntimeSnapshot
 import com.evan.brightnesscurve.service.ServiceController
 import com.evan.brightnesscurve.system.BrightnessSettings
-import com.evan.brightnesscurve.sensor.LightSensorSample
-import com.evan.brightnesscurve.sensor.LightSensorMonitor
 import com.evan.brightnesscurve.sensor.LightSensorStatus
-import com.evan.brightnesscurve.sensor.LuxSmoother
+import com.evan.brightnesscurve.sensor.PassiveLightSensorPreview
+import com.evan.brightnesscurve.sensor.PassiveLightSensorSample
 import com.evan.brightnesscurve.update.AppUpdateState
 import com.evan.brightnesscurve.update.UpdateChecker
 import com.evan.brightnesscurve.update.UpdateDownloader
 import com.evan.brightnesscurve.update.UpdateInstaller
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -89,10 +83,14 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
             canInstallPackages = UpdateInstaller.canRequestPackageInstalls(app)
         )
     )
-    private val passiveLuxSmoother = LuxSmoother(ResponseSpeed.Standard.alpha)
-    private var passiveLightSensorMonitor: LightSensorMonitor? = null
-    private var passiveLuxTimeoutJob: Job? = null
-    private var passiveSensorStartedAtMillis: Long = 0L
+    private val passiveLightSensorPreview = PassiveLightSensorPreview(
+        context = app,
+        scope = viewModelScope,
+        onSample = ::handlePassiveLuxSample,
+        onStatus = ::handlePassiveLightSensorStatus,
+        onUnavailable = ::handlePassiveSensorUnavailable,
+        onTimeout = ::handlePassiveLuxTimeout
+    )
 
     private val editorPreset = combine(
         app.presetRepository.observePresets(),
@@ -483,36 +481,22 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
     }
 
     override fun onCleared() {
-        passiveLuxTimeoutJob?.cancel()
-        passiveLightSensorMonitor?.stop()
+        passiveLightSensorPreview.stop()
         super.onCleared()
     }
 
     private fun startPassiveLightSensor() {
-        passiveLuxTimeoutJob?.cancel()
-        passiveLightSensorMonitor?.stop()
-        passiveLuxSmoother.reset()
-        passiveSensorStartedAtMillis = System.currentTimeMillis()
+        passiveLightSensorPreview.start()
+    }
 
-        val sensorManager = app.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        passiveLightSensorMonitor = LightSensorMonitor(
-            sensorManager = sensorManager,
-            onSample = ::handlePassiveLuxSample,
-            onStatus = ::handlePassiveLightSensorStatus,
-            onUnavailable = { reason ->
-                BrightnessRuntimeState.dispatch(
-                    RuntimeEvent.PassiveSensorUnavailable(
-                        reason = reason,
-                        canWriteSettings = BrightnessSettings.canWrite(app),
-                        brightnessMode = readModeOrNull()
-                    )
-                )
-            }
+    private fun handlePassiveSensorUnavailable(reason: String) {
+        BrightnessRuntimeState.dispatch(
+            RuntimeEvent.PassiveSensorUnavailable(
+                reason = reason,
+                canWriteSettings = BrightnessSettings.canWrite(app),
+                brightnessMode = readModeOrNull()
+            )
         )
-
-        if (passiveLightSensorMonitor?.start() == true) {
-            schedulePassiveLuxTimeout()
-        }
     }
 
     private fun handlePassiveLightSensorStatus(status: LightSensorStatus) {
@@ -527,11 +511,10 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
         )
     }
 
-    private fun handlePassiveLuxSample(sample: LightSensorSample) {
+    private fun handlePassiveLuxSample(sample: PassiveLightSensorSample) {
         val runtime = BrightnessRuntimeState.state.value
         if (runtime.isRunning) return
 
-        val smoothedLux = passiveLuxSmoother.onSample(sample.lux)
         val state = uiState.value
         val preset = state.activePreset
         val target = preset?.let {
@@ -542,7 +525,7 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
                     state.settings.maxAllowedPercent.coerceAtMost(85f)
                 }
                 BrightnessMapping.targetPercent(
-                    lux = smoothedLux,
+                    lux = sample.smoothedLux,
                     points = it.points,
                     minPercent = state.settings.minAllowedPercent,
                     maxPercent = maxAllowed
@@ -552,8 +535,8 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
 
         BrightnessRuntimeState.dispatch(
             RuntimeEvent.PassiveLuxObserved(
-                rawLux = sample.lux,
-                smoothedLux = smoothedLux,
+                rawLux = sample.rawLux,
+                smoothedLux = sample.smoothedLux,
                 receivedAtMillis = sample.receivedAtMillis,
                 sensorName = sample.sensorName,
                 targetPercent = target,
@@ -564,24 +547,16 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
         )
     }
 
-    private fun schedulePassiveLuxTimeout() {
-        passiveLuxTimeoutJob?.cancel()
-        passiveLuxTimeoutJob = viewModelScope.launch {
-            val startedAt = passiveSensorStartedAtMillis
-            delay(LUX_TIMEOUT_MS)
-            val runtime = BrightnessRuntimeState.state.value
-            if (!runtime.isRunning && (runtime.lastLuxUpdateTime == null || runtime.lastLuxUpdateTime < startedAt)) {
-                BrightnessRuntimeState.dispatch(RuntimeEvent.SensorTimedOut)
-            }
+    private fun handlePassiveLuxTimeout(startedAt: Long) {
+        val runtime = BrightnessRuntimeState.state.value
+        if (!runtime.isRunning && (runtime.lastLuxUpdateTime == null || runtime.lastLuxUpdateTime < startedAt)) {
+            BrightnessRuntimeState.dispatch(RuntimeEvent.SensorTimedOut)
         }
     }
 
     private fun readModeOrNull(): Int? =
         runCatching { brightnessController.readMode() }.getOrNull()
 
-    companion object {
-        private const val LUX_TIMEOUT_MS = 5_000L
-    }
 }
 
 class MainViewModelFactory(private val app: BrightnessCurveApp) : ViewModelProvider.Factory {
