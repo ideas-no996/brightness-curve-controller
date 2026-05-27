@@ -15,6 +15,7 @@ import com.evan.brightnesscurve.data.BrightnessPoint
 import com.evan.brightnesscurve.data.BrightnessPreset
 import com.evan.brightnesscurve.data.BrightnessRevisionEntity
 import com.evan.brightnesscurve.data.ResponseSpeed
+import com.evan.brightnesscurve.service.RuntimeEvent
 import com.evan.brightnesscurve.service.BrightnessRuntimeState
 import com.evan.brightnesscurve.service.RuntimeSnapshot
 import com.evan.brightnesscurve.service.ServiceController
@@ -153,14 +154,12 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
     fun refreshWritePermission() {
         val canWrite = BrightnessSettings.canWrite(app)
         canWriteSettings.value = canWrite
-        BrightnessRuntimeState.update {
-            it.copy(
+        BrightnessRuntimeState.dispatch(
+            RuntimeEvent.PermissionRefreshed(
                 canWriteSettings = canWrite,
-                brightnessMode = readModeOrNull(),
-                windowFallbackActive = if (canWrite) false else it.windowFallbackActive,
-                updatedAt = System.currentTimeMillis()
+                brightnessMode = readModeOrNull()
             )
-        }
+        )
     }
 
     fun retryLightSensorDetection() {
@@ -172,16 +171,11 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
     }
 
     fun enableWindowBrightnessFallback() {
-        BrightnessRuntimeState.update {
-            it.copy(
-                windowFallbackActive = true,
-                canWriteSettings = false,
-                brightnessMode = readModeOrNull(),
-                message = "缺少系统亮度权限，先用当前窗口亮度预览",
-                lastError = "缺少修改系统设置权限",
-                updatedAt = System.currentTimeMillis()
+        BrightnessRuntimeState.dispatch(
+            RuntimeEvent.WindowBrightnessFallbackEnabled(
+                brightnessMode = readModeOrNull()
             )
-        }
+        )
     }
 
     fun refreshInstallPermission() {
@@ -494,18 +488,13 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
             onSample = ::handlePassiveLuxSample,
             onStatus = ::handlePassiveLightSensorStatus,
             onUnavailable = { reason ->
-                BrightnessRuntimeState.update {
-                    it.copy(
-                        hasLightSensor = false,
-                        lightSensorRegistered = false,
-                        lightSensorTimedOut = false,
+                BrightnessRuntimeState.dispatch(
+                    RuntimeEvent.PassiveSensorUnavailable(
+                        reason = reason,
                         canWriteSettings = BrightnessSettings.canWrite(app),
-                        brightnessMode = readModeOrNull(),
-                        message = reason,
-                        lastError = reason,
-                        updatedAt = System.currentTimeMillis()
+                        brightnessMode = readModeOrNull()
                     )
-                }
+                )
             }
         )
 
@@ -515,26 +504,15 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
     }
 
     private fun handlePassiveLightSensorStatus(status: LightSensorStatus) {
-        BrightnessRuntimeState.update {
-            if (it.isRunning) {
-                it.copy(
-                    hasLightSensor = status.hasLightSensor,
-                    lightSensorName = status.sensorName,
-                    lightSensorRegistered = status.isRegistered,
-                    updatedAt = System.currentTimeMillis()
-                )
-            } else {
-                it.copy(
-                    hasLightSensor = status.hasLightSensor,
-                    lightSensorName = status.sensorName,
-                    lightSensorRegistered = status.isRegistered,
-                    canWriteSettings = BrightnessSettings.canWrite(app),
-                    brightnessMode = readModeOrNull(),
-                    message = if (status.isRegistered) "正在读取环境光" else it.message,
-                    updatedAt = System.currentTimeMillis()
-                )
-            }
-        }
+        BrightnessRuntimeState.dispatch(
+            RuntimeEvent.PassiveSensorStatusChanged(
+                hasLightSensor = status.hasLightSensor,
+                sensorName = status.sensorName,
+                isRegistered = status.isRegistered,
+                canWriteSettings = BrightnessSettings.canWrite(app),
+                brightnessMode = readModeOrNull()
+            )
+        )
     }
 
     private fun handlePassiveLuxSample(sample: LightSensorSample) {
@@ -560,35 +538,18 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
             }.getOrNull()
         }?.takeUnless { it.isNaN() || it.isInfinite() }
 
-        BrightnessRuntimeState.update {
-            if (it.isRunning) {
-                it
-            } else {
-                it.copy(
-                    isRunning = false,
-                    autoEnabled = false,
-                    rawLux = sample.lux,
-                    smoothedLux = smoothedLux,
-                    lastLux = sample.lux,
-                    lastLuxUpdateTime = sample.receivedAtMillis,
-                    targetPercent = target,
-                    hasLightSensor = true,
-                    lightSensorName = sample.sensorName,
-                    lightSensorRegistered = true,
-                    lightSensorTimedOut = false,
-                    activePresetName = preset?.name,
-                    canWriteSettings = BrightnessSettings.canWrite(app),
-                    brightnessMode = readModeOrNull(),
-                    message = if (target == null) {
-                        "已读取环境光，但还没有可用亮度曲线"
-                    } else {
-                        "已读取环境光，但未自动调节"
-                    },
-                    lastError = null,
-                    updatedAt = System.currentTimeMillis()
-                )
-            }
-        }
+        BrightnessRuntimeState.dispatch(
+            RuntimeEvent.PassiveLuxObserved(
+                rawLux = sample.lux,
+                smoothedLux = smoothedLux,
+                receivedAtMillis = sample.receivedAtMillis,
+                sensorName = sample.sensorName,
+                targetPercent = target,
+                activePresetName = preset?.name,
+                canWriteSettings = BrightnessSettings.canWrite(app),
+                brightnessMode = readModeOrNull()
+            )
+        )
     }
 
     private fun schedulePassiveLuxTimeout() {
@@ -598,14 +559,7 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
             delay(LUX_TIMEOUT_MS)
             val runtime = BrightnessRuntimeState.state.value
             if (!runtime.isRunning && (runtime.lastLuxUpdateTime == null || runtime.lastLuxUpdateTime < startedAt)) {
-                BrightnessRuntimeState.update {
-                    it.copy(
-                        lightSensorTimedOut = true,
-                        message = "未收到环境光数据",
-                        lastError = "5 秒内未收到环境光数据",
-                        updatedAt = System.currentTimeMillis()
-                    )
-                }
+                BrightnessRuntimeState.dispatch(RuntimeEvent.SensorTimedOut)
             }
         }
     }

@@ -52,6 +52,7 @@ import com.evan.brightnesscurve.data.BrightnessPoint
 import com.evan.brightnesscurve.data.BrightnessPreset
 import com.evan.brightnesscurve.data.BrightnessRevisionEntity
 import com.evan.brightnesscurve.data.ResponseSpeed
+import com.evan.brightnesscurve.service.RuntimeStatus
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -242,12 +243,15 @@ private fun HomeTab(
                             Text(controlStatus(state))
                         }
                         Switch(
-                            checked = state.settings.serviceEnabled || state.runtime.isRunning,
+                            checked = state.settings.serviceEnabled,
                             onCheckedChange = onToggleService,
                             enabled = true
                         )
                     }
-                    if (state.runtime.lightSensorTimedOut) {
+                    state.runtime.status.recommendedAction?.let {
+                        Text(it, color = MaterialTheme.colorScheme.secondary)
+                    }
+                    if (state.runtime.status == RuntimeStatus.SensorTimeout) {
                         OutlinedButton(onClick = onRetryLightSensor, modifier = Modifier.fillMaxWidth()) {
                             Text("重试检测")
                         }
@@ -699,6 +703,7 @@ private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit)
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("诊断", style = MaterialTheme.typography.titleMedium)
+            MetricRow("runtimeStatus", state.runtime.status.name)
             MetricRow("hasLightSensor", formatNullableBoolean(state.runtime.hasLightSensor))
             MetricRow("sensorRegistered", state.runtime.lightSensorRegistered.toString())
             MetricRow("sensorName", state.runtime.lightSensorName ?: "-")
@@ -710,7 +715,7 @@ private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit)
             MetricRow("canWriteSettings", state.canWriteSettings.toString())
             MetricRow("brightnessMode", formatBrightnessMode(state.runtime.brightnessMode))
             MetricRow("lastError", state.runtime.lastError ?: "-")
-            if (state.runtime.lightSensorTimedOut) {
+            if (state.runtime.status == RuntimeStatus.SensorTimeout) {
                 OutlinedButton(onClick = onRetryLightSensor, modifier = Modifier.fillMaxWidth()) {
                     Text("重试检测")
                 }
@@ -817,6 +822,7 @@ private fun DebugInfoPanel(state: MainUiState) {
             }
             if (expanded) {
                 MetricRow("当前预设", state.activePreset?.name ?: "未初始化")
+                MetricRow("runtimeStatus", state.runtime.status.name)
                 MetricRow("hasLightSensor", formatNullableBoolean(state.runtime.hasLightSensor))
                 MetricRow("sensorName", state.runtime.lightSensorName ?: "-")
                 MetricRow("sensorRegistered", state.runtime.lightSensorRegistered.toString())
@@ -837,17 +843,19 @@ private fun DebugInfoPanel(state: MainUiState) {
 }
 
 private fun environmentTitle(state: MainUiState): String {
-    if (state.runtime.lightSensorTimedOut) return "未收到环境光数据"
+    when (state.runtime.status) {
+        RuntimeStatus.PermissionMissing,
+        RuntimeStatus.NoSensor,
+        RuntimeStatus.SensorTimeout,
+        RuntimeStatus.WriteFailed,
+        RuntimeStatus.PausedScreenOff -> return state.runtime.status.title
+        else -> Unit
+    }
     return environmentLabel(state.runtime.smoothedLux ?: state.runtime.rawLux)
 }
 
 private fun controlStatus(state: MainUiState): String {
-    return when {
-        state.runtime.isRunning -> "正在自动照顾屏幕亮度"
-        state.runtime.lastLux != null -> "已读取环境光，但未自动调节"
-        state.runtime.lightSensorTimedOut -> "未收到环境光，建议重试检测"
-        else -> "正在读取环境光"
-    }
+    return state.runtime.message ?: state.runtime.status.description
 }
 
 private fun environmentLabel(lux: Float?): String {
