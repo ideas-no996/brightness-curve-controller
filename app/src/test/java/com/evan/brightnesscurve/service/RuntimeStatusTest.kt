@@ -107,9 +107,11 @@ class RuntimeStatusTest {
                 sensorName = "ALS",
                 activePresetName = "Preset",
                 targetPercent = null,
+                targetSystemValue = null,
                 preserveExistingTargetPercent = true,
                 canWriteSettings = true,
                 brightnessMode = 0,
+                noWriteReason = null,
                 message = "已读取环境光，屏幕关闭时暂停写入",
                 lastError = null,
                 isPausedForScreenOff = true
@@ -118,6 +120,33 @@ class RuntimeStatusTest {
 
         assertEquals(42f, snapshot.targetPercent)
         assertEquals(RuntimeStatus.PausedScreenOff, snapshot.status)
+    }
+
+    @Test
+    fun `service lux records target system value and no write reason`() {
+        val snapshot = reduceRuntimeSnapshot(
+            RuntimeSnapshot(isRunning = true, canWriteSettings = true),
+            RuntimeEvent.ServiceLuxObserved(
+                rawLux = 18f,
+                smoothedLux = 20f,
+                receivedAtMillis = 1000L,
+                sensorName = "ALS",
+                activePresetName = "Preset",
+                targetPercent = 50f,
+                targetSystemValue = 128,
+                preserveExistingTargetPercent = false,
+                canWriteSettings = true,
+                brightnessMode = 0,
+                noWriteReason = "Throttled",
+                message = "已感知光线变化，等待节流窗口",
+                lastError = null,
+                isPausedForScreenOff = false
+            )
+        )
+
+        assertEquals(50f, snapshot.targetPercent)
+        assertEquals(128, snapshot.targetSystemValue)
+        assertEquals("Throttled", snapshot.lastNoWriteReason)
     }
 
     @Test

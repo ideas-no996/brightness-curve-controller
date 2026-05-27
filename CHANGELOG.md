@@ -12,6 +12,7 @@
 - Added release checklist, signing certificate fingerprint, checksum verification guidance, and versioning policy.
 - Clarified in-app update permissions and current-window brightness preview behavior.
 - Added in-app SHA-256 verification for downloaded release APKs before installer handoff.
+- Added target system brightness and no-write reason to runtime diagnostics and copied diagnostic reports.
 
 ## v1.0.5
 

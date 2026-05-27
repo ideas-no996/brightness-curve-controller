@@ -199,9 +199,11 @@ class BrightnessControlService : Service() {
                     sensorName = sample.sensorName,
                     activePresetName = null,
                     targetPercent = null,
+                    targetSystemValue = null,
                     preserveExistingTargetPercent = false,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
+                    noWriteReason = null,
                     message = "已读取环境光，等待亮度曲线加载",
                     lastError = null,
                     isPausedForScreenOff = false
@@ -220,9 +222,11 @@ class BrightnessControlService : Service() {
                     sensorName = sample.sensorName,
                     activePresetName = preset.name,
                     targetPercent = null,
+                    targetSystemValue = null,
                     preserveExistingTargetPercent = true,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
+                    noWriteReason = null,
                     message = "已读取环境光，屏幕关闭时暂停写入",
                     lastError = null,
                     isPausedForScreenOff = true
@@ -254,9 +258,11 @@ class BrightnessControlService : Service() {
                     sensorName = sample.sensorName,
                     activePresetName = preset.name,
                     targetPercent = null,
+                    targetSystemValue = null,
                     preserveExistingTargetPercent = true,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
+                    noWriteReason = null,
                     message = error,
                     lastError = error,
                     isPausedForScreenOff = false
@@ -275,9 +281,11 @@ class BrightnessControlService : Service() {
                     sensorName = sample.sensorName,
                     activePresetName = preset.name,
                     targetPercent = null,
+                    targetSystemValue = null,
                     preserveExistingTargetPercent = true,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
+                    noWriteReason = null,
                     message = error,
                     lastError = error,
                     isPausedForScreenOff = false
@@ -305,9 +313,11 @@ class BrightnessControlService : Service() {
                 sensorName = sample.sensorName,
                 activePresetName = preset.name,
                 targetPercent = targetPercent,
+                targetSystemValue = targetSystemValue,
                 preserveExistingTargetPercent = false,
                 canWriteSettings = canWrite,
                 brightnessMode = mode,
+                noWriteReason = decision.noWriteReason?.name,
                 message = when {
                     !canWrite -> "已读取环境光，但缺少写入亮度权限"
                     shouldWrite -> "正在柔和调整亮度"

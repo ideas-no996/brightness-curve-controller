@@ -102,12 +102,14 @@ data class RuntimeSnapshot(
     val lastLux: Float? = null,
     val lastLuxUpdateTime: Long? = null,
     val targetPercent: Float? = null,
+    val targetSystemValue: Int? = null,
     val writtenPercent: Float? = null,
     val appliedBrightnessValue: Int? = null,
     val currentBrightnessValue: Int? = null,
     val lastWriteTargetValue: Int? = null,
     val lastWriteReadBackValue: Int? = null,
     val lastWriteSucceeded: Boolean? = null,
+    val lastNoWriteReason: String? = null,
     val canWriteSettings: Boolean? = null,
     val brightnessMode: Int? = null,
     val autoControlDesired: Boolean = false,
@@ -150,6 +152,7 @@ sealed interface RuntimeEvent {
         val receivedAtMillis: Long,
         val sensorName: String?,
         val targetPercent: Float?,
+        val targetSystemValue: Int?,
         val activePresetName: String?,
         val canWriteSettings: Boolean,
         val brightnessMode: Int?
@@ -194,9 +197,11 @@ sealed interface RuntimeEvent {
         val sensorName: String?,
         val activePresetName: String?,
         val targetPercent: Float?,
+        val targetSystemValue: Int?,
         val preserveExistingTargetPercent: Boolean,
         val canWriteSettings: Boolean,
         val brightnessMode: Int?,
+        val noWriteReason: String?,
         val message: String,
         val lastError: String?,
         val isPausedForScreenOff: Boolean
@@ -330,6 +335,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
                 lastLux = event.rawLux,
                 lastLuxUpdateTime = event.receivedAtMillis,
                 targetPercent = event.targetPercent,
+                targetSystemValue = event.targetSystemValue,
                 hasLightSensor = true,
                 lightSensorName = event.sensorName,
                 lightSensorRegistered = true,
@@ -416,6 +422,11 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             } else {
                 event.targetPercent
             },
+            targetSystemValue = if (event.preserveExistingTargetPercent) {
+                current.targetSystemValue
+            } else {
+                event.targetSystemValue
+            },
             activePresetName = event.activePresetName,
             hasLightSensor = true,
             lightSensorName = event.sensorName,
@@ -423,6 +434,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             lightSensorTimedOut = false,
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
+            lastNoWriteReason = event.noWriteReason,
             message = event.message,
             lastError = event.lastError,
             failureReason = when {
@@ -441,6 +453,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             lastWriteTargetValue = null,
             lastWriteReadBackValue = event.currentBrightnessValue,
             lastWriteSucceeded = false,
+            lastNoWriteReason = null,
             failureReason = RuntimeFailureReason.PermissionMissing
         )
 
@@ -448,11 +461,13 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
             currentBrightnessValue = event.currentBrightnessValue,
+            targetSystemValue = event.targetSystemValue,
             message = event.error,
             lastError = event.error,
             lastWriteTargetValue = event.targetSystemValue,
             lastWriteReadBackValue = event.currentBrightnessValue,
             lastWriteSucceeded = false,
+            lastNoWriteReason = null,
             failureReason = if (event.canWriteSettings) {
                 RuntimeFailureReason.WriteFailed
             } else {
@@ -462,11 +477,13 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         is RuntimeEvent.ServiceBrightnessWritten -> current.copy(
             writtenPercent = event.writtenPercent,
+            targetSystemValue = event.targetSystemValue,
             appliedBrightnessValue = event.readBackSystemValue,
             currentBrightnessValue = event.readBackSystemValue,
             lastWriteTargetValue = event.targetSystemValue,
             lastWriteReadBackValue = event.readBackSystemValue,
             lastWriteSucceeded = true,
+            lastNoWriteReason = null,
             canWriteSettings = true,
             brightnessMode = event.brightnessMode,
             lastError = null,

@@ -39,7 +39,7 @@ Current code evidence:
 
 Remaining gap:
 
-- No exported diagnostic report shows the permission state at the moment of failure.
+- The copied diagnostic report includes permission state, but it still needs real issue-report feedback from failed devices.
 
 ### System Brightness Write
 
@@ -63,14 +63,14 @@ Current code evidence:
   - `lastWriteTargetValue`
   - `lastWriteReadBackValue`
   - `lastWriteSucceeded`
+  - `targetSystemBrightness`
   - `brightnessMode`
   - `lastError`
 
 Remaining gaps:
 
 - Exact read-back equality may fail on devices that clamp or transform brightness values. The current behavior correctly surfaces the mismatch, but compatibility docs need to explain this.
-- There is no adb script that proves the before/after system setting values.
-- No in-app export captures the last write result.
+- The adb script and copied diagnostic report now capture write evidence, but they still need to be exercised on more physical devices.
 
 ### Ambient Light Sensor
 
@@ -93,7 +93,7 @@ Current code evidence:
 Remaining gaps:
 
 - Timeout threshold is fixed at 5 seconds and not documented as a compatibility assumption.
-- Sensor vendor/name is visible in diagnostics but not exportable.
+- Sensor name is exportable through the copied diagnostic report; sensor vendor is still only visible in adb `sensorservice` output.
 
 ### Curve Decision
 
@@ -112,11 +112,9 @@ Current code evidence:
 - `BrightnessMapping.targetPercent`
 - service logs `targetPercent`, `targetSystemBrightness`, `shouldWrite`, and `noWriteReason`
 
-Remaining gaps:
+Remaining gap:
 
-- UI does not show no-write reason directly.
-- Diagnostics do not show mapped percent before ramp.
-- No exported report includes response speed, min/max, throttle status, and no-write reason together.
+- Diagnostics now show target system brightness and no-write reason, but still do not show mapped percent before ramp.
 
 ### UI State
 
@@ -139,7 +137,7 @@ Current code evidence:
 Remaining gaps:
 
 - The status enum is strong, but normal users still see a mix of friendly labels and raw diagnostic names.
-- The app needs a copied diagnostic report that gives maintainers raw data while giving users a short explanation.
+- The copied diagnostic report gives maintainers raw data; the user-facing explanation still needs refinement from real support cases.
 
 ## Required Manual Acceptance Test
 
@@ -223,19 +221,20 @@ Settings -> Diagnostics includes a "复制诊断报告" action. The report is co
 - device manufacturer, model, Android version, SDK, and fingerprint
 - permission and brightness mode
 - current brightness, target percent, last write target, read-back value, and write success
+- target system brightness and last no-write reason
 - raw lux, smoothed lux, light sensor name, registration state, and timeout state
 - service running state, active preset, runtime message, and last error
 - update permission/status fields
 
-## Required Next Artifact
+## Verification Tool Status
 
-Add a script:
+The repository includes:
 
 ```text
 scripts/collect-core-verification.ps1
 ```
 
-It should collect:
+It collects:
 
 - app version
 - device model

@@ -167,13 +167,11 @@ The UI must make this distinction impossible to miss. If not, users may report t
 
 ### 8. Release Integrity Exists But Is Not User-Centered
 
-Release automation uploads `SHA256SUMS.txt`. That is good infrastructure, but the README does not yet give a plain user workflow for verifying the APK, and the app updater does not check the checksum asset.
+Release automation uploads `SHA256SUMS.txt`, the README now gives a plain verification workflow, and the app updater verifies the release asset SHA-256 before installer handoff when GitHub provides a digest.
 
-Required next step:
+Remaining next step:
 
-- Document APK checksum verification for Windows/macOS/Linux.
-- Publish signing certificate fingerprint.
-- Consider checking release checksum before handing APK to Android installer.
+- Exercise the in-app update verification path against a real future release.
 
 ### 9. Tests Are Mostly Unit-Level
 

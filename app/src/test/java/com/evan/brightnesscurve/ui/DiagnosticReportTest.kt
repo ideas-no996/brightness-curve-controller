@@ -17,10 +17,12 @@ class DiagnosticReportTest {
                 rawLux = 120f,
                 smoothedLux = 100f,
                 targetPercent = 40f,
+                targetSystemValue = 102,
                 currentBrightnessValue = 101,
                 lastWriteTargetValue = 102,
                 lastWriteReadBackValue = 102,
                 lastWriteSucceeded = true,
+                lastNoWriteReason = "Throttled",
                 brightnessMode = 0,
                 lightSensorName = "Test ALS",
                 lightSensorRegistered = true
@@ -46,10 +48,12 @@ class DiagnosticReportTest {
         assertTrue(report.contains("rawLux=120.0"))
         assertTrue(report.contains("smoothedLux=100.0"))
         assertTrue(report.contains("targetPercent=40.0"))
+        assertTrue(report.contains("targetSystemValue=102"))
         assertTrue(report.contains("currentSystemBrightness=101"))
         assertTrue(report.contains("lastWriteTargetValue=102"))
         assertTrue(report.contains("lastWriteReadBackValue=102"))
         assertTrue(report.contains("lastWriteSucceeded=true"))
+        assertTrue(report.contains("lastNoWriteReason=Throttled"))
         assertTrue(report.contains("lightSensorName=Test ALS"))
     }
 }

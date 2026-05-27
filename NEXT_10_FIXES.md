@@ -60,7 +60,7 @@ Acceptance:
 
 Type: app code
 
-Status: implemented in the Settings diagnostics panel; still needs real issue-report feedback.
+Status: implemented in the Settings diagnostics panel, including target system brightness and no-write reason; still needs real issue-report feedback.
 
 Action:
 
@@ -155,7 +155,7 @@ Acceptance:
 
 Type: app UX and reliability
 
-Status: partially implemented with explicit fallback copy on the home permission card.
+Status: implemented with explicit fallback copy on the home permission card and raw diagnostics showing whether system write/read-back happened.
 
 Action:
 

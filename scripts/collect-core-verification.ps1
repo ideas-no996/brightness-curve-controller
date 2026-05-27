@@ -66,15 +66,18 @@ Write-TextFile -Name "summary.txt" -Lines @(
 )
 
 Capture-Adb -Name "adb-devices.txt" -Arguments @("devices", "-l")
-Capture-Adb -Name "device-properties.txt" -Arguments @(
-    "shell",
-    "getprop",
+$devicePropertyKeys = @(
     "ro.product.manufacturer",
     "ro.product.model",
     "ro.build.version.release",
     "ro.build.version.sdk",
     "ro.build.fingerprint"
 )
+$deviceProperties = foreach ($key in $devicePropertyKeys) {
+    $value = (Invoke-AdbText -Arguments @("shell", "getprop", $key) -join "`n").Trim()
+    "$key=$value"
+}
+Write-TextFile -Name "device-properties.txt" -Lines $deviceProperties
 Capture-Adb -Name "package.txt" -Arguments @("shell", "dumpsys", "package", $PackageName)
 Capture-Adb -Name "brightness-before.txt" -Arguments @("shell", "settings", "list", "system")
 Capture-Adb -Name "sensorservice.txt" -Arguments @("shell", "dumpsys", "sensorservice")
@@ -97,6 +100,11 @@ if ($Interactive) {
         "screen_brightness_mode=$afterMode",
         "screen_brightness=$afterBrightness"
     )
+    Capture-Adb -Name "activity-services-after.txt" -Arguments @("shell", "dumpsys", "activity", "services", $PackageName)
+
+    $afterLogLines = Invoke-AdbText -Arguments @("logcat", "-d", "-t", $LogLines.ToString())
+    $afterFilteredLog = $afterLogLines | Select-String -Pattern $logPattern | ForEach-Object { $_.ToString() }
+    Write-TextFile -Name "logcat-filtered-after.txt" -Lines $afterFilteredLog
 }
 
 Write-Host ""

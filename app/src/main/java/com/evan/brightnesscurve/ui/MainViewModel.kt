@@ -549,6 +549,7 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
                 receivedAtMillis = sample.receivedAtMillis,
                 sensorName = sample.sensorName,
                 targetPercent = target,
+                targetSystemValue = target?.let(BrightnessController::percentToSystemValue),
                 activePresetName = preset?.name,
                 canWriteSettings = BrightnessSettings.canWrite(app),
                 brightnessMode = readModeOrNull()
