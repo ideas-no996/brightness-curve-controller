@@ -92,6 +92,8 @@ Acceptance:
 
 Type: app copy and documentation
 
+Status: implemented in README, privacy notes, FAQ, and Settings -> Software Update copy.
+
 Action:
 
 - In Settings -> Software Update, state that network is only used for GitHub Release checks and APK downloads.
@@ -152,6 +154,8 @@ Acceptance:
 ## 10. Separate System Brightness From Window Preview
 
 Type: app UX and reliability
+
+Status: partially implemented with explicit fallback copy on the home permission card.
 
 Action:
 

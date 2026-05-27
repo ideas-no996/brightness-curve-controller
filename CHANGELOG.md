@@ -10,6 +10,7 @@
 - Added a PowerShell adb collection script for core brightness verification bundles.
 - Added a copyable in-app diagnostic report covering device, permission, sensor, target brightness, write, read-back, and error state.
 - Added release checklist, signing certificate fingerprint, checksum verification guidance, and versioning policy.
+- Clarified in-app update permissions and current-window brightness preview behavior.
 
 ## v1.0.5
 

@@ -52,6 +52,9 @@ internal fun HomeTab(
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("需要授权修改系统设置", fontWeight = FontWeight.Bold)
                         Text("授权后，App 才能写入全局屏幕亮度。")
+                        if (state.runtime.windowFallbackActive) {
+                            Text("当前只能预览本 App 窗口亮度，不代表系统亮度已经被控制。")
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = onOpenWriteSettings) {
                                 Text("去授权")

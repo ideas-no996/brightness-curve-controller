@@ -118,6 +118,7 @@ internal fun SettingsTab(
                     val latest = update.latest
 
                     Text("软件更新", style = MaterialTheme.typography.titleMedium)
+                    Text("联网仅用于手动检查 GitHub Release 和下载 APK；亮度控制本身离线工作，安装更新也必须经过 Android 系统确认。")
                     MetricRow("当前版本", update.currentVersionName)
                     MetricRow("更新状态", update.statusText)
                     update.lastCheckedAt?.let {
