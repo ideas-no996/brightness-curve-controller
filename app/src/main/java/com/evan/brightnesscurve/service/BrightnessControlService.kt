@@ -320,17 +320,31 @@ class BrightnessControlService : Service() {
                     )
                     return@withLock
                 }
-                val appliedValue = brightnessController.writeManualBrightness(targetPercent)
-                Log.d(TAG, "write brightness targetPercent=$targetPercent, systemValue=$appliedValue")
-                lastWrittenPercent = targetPercent
-                lastWriteElapsed = SystemClock.elapsedRealtime()
-                BrightnessRuntimeState.dispatch(
-                    RuntimeEvent.ServiceBrightnessWritten(
-                        writtenPercent = targetPercent,
-                        appliedBrightnessValue = appliedValue,
-                        brightnessMode = readModeOrNull()
+                runCatching {
+                    brightnessController.writeManualBrightness(targetPercent)
+                }.onSuccess { appliedValue ->
+                    Log.d(TAG, "write brightness targetPercent=$targetPercent, systemValue=$appliedValue")
+                    lastWrittenPercent = targetPercent
+                    lastWriteElapsed = SystemClock.elapsedRealtime()
+                    BrightnessRuntimeState.dispatch(
+                        RuntimeEvent.ServiceBrightnessWritten(
+                            writtenPercent = targetPercent,
+                            appliedBrightnessValue = appliedValue,
+                            brightnessMode = readModeOrNull()
+                        )
                     )
-                )
+                }.onFailure { throwable ->
+                    val canWrite = brightnessController.canWrite()
+                    val error = throwable.message ?: "亮度写入失败"
+                    Log.e(TAG, "write brightness failed", throwable)
+                    BrightnessRuntimeState.dispatch(
+                        RuntimeEvent.ServiceBrightnessWriteFailed(
+                            error = error,
+                            canWriteSettings = canWrite,
+                            brightnessMode = readModeOrNull()
+                        )
+                    )
+                }
             }
         }
     }

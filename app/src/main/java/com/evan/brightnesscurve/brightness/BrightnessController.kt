@@ -28,16 +28,17 @@ class BrightnessController(private val context: Context) {
 
     fun writeManualBrightness(percent: Float): Int {
         val systemValue = percentToSystemValue(percent)
-        Settings.System.putInt(
+        val modeWritten = Settings.System.putInt(
             resolver,
             Settings.System.SCREEN_BRIGHTNESS_MODE,
             Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
         )
-        Settings.System.putInt(
+        val brightnessWritten = Settings.System.putInt(
             resolver,
             Settings.System.SCREEN_BRIGHTNESS,
             systemValue
         )
+        check(modeWritten && brightnessWritten) { "系统拒绝写入亮度设置" }
         return systemValue
     }
 

@@ -53,7 +53,7 @@ class RuntimeStatusTest {
         val snapshot = RuntimeSnapshot(
             isRunning = true,
             canWriteSettings = true,
-            lastError = "写入前权限失效"
+            failureReason = RuntimeFailureReason.WriteFailed
         )
 
         assertEquals(RuntimeStatus.WriteFailed, snapshot.resolvedRuntimeStatus())
@@ -66,7 +66,8 @@ class RuntimeStatusTest {
                 isRunning = true,
                 autoControlDesired = true,
                 lightSensorRegistered = true,
-                lastError = "5 秒内未收到环境光数据"
+                lastError = "5 秒内未收到环境光数据",
+                failureReason = RuntimeFailureReason.SensorTimeout
             ),
             RuntimeEvent.ServiceStopped("服务已停止，已尝试恢复原亮度设置")
         )
@@ -74,6 +75,7 @@ class RuntimeStatusTest {
         assertEquals(false, snapshot.isRunning)
         assertEquals(true, snapshot.autoControlDesired)
         assertEquals("5 秒内未收到环境光数据", snapshot.lastError)
+        assertEquals(RuntimeFailureReason.SensorTimeout, snapshot.failureReason)
         assertEquals("服务已停止，已尝试恢复原亮度设置", snapshot.message)
     }
 
@@ -116,5 +118,35 @@ class RuntimeStatusTest {
 
         assertEquals(42f, snapshot.targetPercent)
         assertEquals(RuntimeStatus.PausedScreenOff, snapshot.status)
+    }
+
+    @Test
+    fun `write failure event produces write failed status when permission remains available`() {
+        val snapshot = reduceRuntimeSnapshot(
+            RuntimeSnapshot(isRunning = true, canWriteSettings = true),
+            RuntimeEvent.ServiceBrightnessWriteFailed(
+                error = "系统拒绝写入亮度设置",
+                canWriteSettings = true,
+                brightnessMode = 0
+            )
+        )
+
+        assertEquals(RuntimeFailureReason.WriteFailed, snapshot.failureReason)
+        assertEquals(RuntimeStatus.WriteFailed, snapshot.status)
+    }
+
+    @Test
+    fun `write failure event produces permission status when permission was lost`() {
+        val snapshot = reduceRuntimeSnapshot(
+            RuntimeSnapshot(isRunning = true, canWriteSettings = true),
+            RuntimeEvent.ServiceBrightnessWriteFailed(
+                error = "写入失败",
+                canWriteSettings = false,
+                brightnessMode = 0
+            )
+        )
+
+        assertEquals(RuntimeFailureReason.PermissionMissing, snapshot.failureReason)
+        assertEquals(RuntimeStatus.PermissionMissing, snapshot.status)
     }
 }

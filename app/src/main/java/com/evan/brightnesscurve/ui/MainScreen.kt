@@ -715,6 +715,7 @@ private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit)
             MetricRow("appliedBrightnessValue", state.runtime.appliedBrightnessValue?.toString() ?: "-")
             MetricRow("canWriteSettings", state.canWriteSettings.toString())
             MetricRow("brightnessMode", formatBrightnessMode(state.runtime.brightnessMode))
+            MetricRow("failureReason", state.runtime.failureReason?.name ?: "-")
             MetricRow("lastError", state.runtime.lastError ?: "-")
             if (state.runtime.status == RuntimeStatus.SensorTimeout) {
                 OutlinedButton(onClick = onRetryLightSensor, modifier = Modifier.fillMaxWidth()) {
@@ -837,6 +838,7 @@ private fun DebugInfoPanel(state: MainUiState) {
                 MetricRow("applied", state.runtime.appliedBrightnessValue?.toString() ?: "-")
                 MetricRow("canWrite", state.canWriteSettings.toString())
                 MetricRow("brightnessMode", formatBrightnessMode(state.runtime.brightnessMode))
+                MetricRow("failureReason", state.runtime.failureReason?.name ?: "-")
                 MetricRow("lastError", state.runtime.lastError ?: "-")
                 MetricRow("response", state.settings.responseSpeed.label)
             }

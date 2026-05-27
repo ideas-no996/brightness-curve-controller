@@ -10,6 +10,13 @@ enum class RuntimeSeverity {
     Error
 }
 
+enum class RuntimeFailureReason {
+    PermissionMissing,
+    NoSensor,
+    SensorTimeout,
+    WriteFailed
+}
+
 enum class RuntimeStatus(
     val title: String,
     val description: String,
@@ -104,6 +111,7 @@ data class RuntimeSnapshot(
     val activePresetName: String? = null,
     val message: String? = null,
     val lastError: String? = null,
+    val failureReason: RuntimeFailureReason? = null,
     val updatedAt: Long? = null
 )
 
@@ -192,6 +200,12 @@ sealed interface RuntimeEvent {
         val brightnessMode: Int?
     ) : RuntimeEvent
 
+    data class ServiceBrightnessWriteFailed(
+        val error: String,
+        val canWriteSettings: Boolean,
+        val brightnessMode: Int?
+    ) : RuntimeEvent
+
     data class ServiceBrightnessWritten(
         val writtenPercent: Float,
         val appliedBrightnessValue: Int?,
@@ -225,10 +239,13 @@ sealed interface RuntimeEvent {
 
 fun RuntimeSnapshot.resolvedRuntimeStatus(): RuntimeStatus {
     return when {
+        failureReason == RuntimeFailureReason.PermissionMissing -> RuntimeStatus.PermissionMissing
+        failureReason == RuntimeFailureReason.NoSensor -> RuntimeStatus.NoSensor
+        failureReason == RuntimeFailureReason.SensorTimeout -> RuntimeStatus.SensorTimeout
+        failureReason == RuntimeFailureReason.WriteFailed -> RuntimeStatus.WriteFailed
         canWriteSettings == false && (autoControlDesired || isRunning) -> RuntimeStatus.PermissionMissing
         hasLightSensor == false -> RuntimeStatus.NoSensor
         lightSensorTimedOut -> RuntimeStatus.SensorTimeout
-        isWriteFailure() -> RuntimeStatus.WriteFailed
         isPausedForScreenOff && isRunning -> RuntimeStatus.PausedScreenOff
         isRunning -> RuntimeStatus.AutoRunning
         lastLux != null -> RuntimeStatus.SensorReady
@@ -242,7 +259,12 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
         is RuntimeEvent.PermissionRefreshed -> current.copy(
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
-            windowFallbackActive = if (event.canWriteSettings) false else current.windowFallbackActive
+            windowFallbackActive = if (event.canWriteSettings) false else current.windowFallbackActive,
+            failureReason = if (event.canWriteSettings && current.failureReason == RuntimeFailureReason.PermissionMissing) {
+                null
+            } else {
+                current.failureReason
+            }
         )
 
         is RuntimeEvent.WindowBrightnessFallbackEnabled -> current.copy(
@@ -250,7 +272,8 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             canWriteSettings = false,
             brightnessMode = event.brightnessMode,
             message = "缺少系统亮度权限，先用当前窗口亮度预览",
-            lastError = "缺少修改系统设置权限"
+            lastError = "缺少修改系统设置权限",
+            failureReason = RuntimeFailureReason.PermissionMissing
         )
 
         is RuntimeEvent.PassiveSensorUnavailable -> current.copy(
@@ -260,7 +283,8 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
             message = event.reason,
-            lastError = event.reason
+            lastError = event.reason,
+            failureReason = RuntimeFailureReason.NoSensor
         )
 
         is RuntimeEvent.PassiveSensorStatusChanged -> {
@@ -284,7 +308,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         is RuntimeEvent.PassiveLuxObserved -> {
             if (current.isRunning) {
-                return current
+                return current.withResolvedStatus()
             }
             current.copy(
                 isRunning = false,
@@ -305,14 +329,16 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
                 } else {
                     "已读取环境光，但未自动调节"
                 },
-                lastError = null
+                lastError = null,
+                failureReason = null
             )
         }
 
         RuntimeEvent.SensorTimedOut -> current.copy(
             lightSensorTimedOut = true,
             message = "未收到环境光数据",
-            lastError = "5 秒内未收到环境光数据"
+            lastError = "5 秒内未收到环境光数据",
+            failureReason = RuntimeFailureReason.SensorTimeout
         )
 
         RuntimeEvent.ScreenTurnedOff -> current.copy(
@@ -335,7 +361,8 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
             message = event.reason,
-            lastError = event.reason
+            lastError = event.reason,
+            failureReason = RuntimeFailureReason.NoSensor
         )
 
         is RuntimeEvent.ServicePermissionMissing -> current.copy(
@@ -343,7 +370,8 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             canWriteSettings = false,
             brightnessMode = event.brightnessMode,
             message = "缺少修改系统设置权限",
-            lastError = "缺少修改系统设置权限"
+            lastError = "缺少修改系统设置权限",
+            failureReason = RuntimeFailureReason.PermissionMissing
         )
 
         is RuntimeEvent.ServiceStopped -> current.copy(
@@ -382,14 +410,32 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
             message = event.message,
-            lastError = event.lastError
+            lastError = event.lastError,
+            failureReason = when {
+                event.lastError == null -> null
+                !event.canWriteSettings -> RuntimeFailureReason.PermissionMissing
+                else -> RuntimeFailureReason.WriteFailed
+            }
         )
 
         is RuntimeEvent.ServiceWritePermissionLost -> current.copy(
             canWriteSettings = false,
             brightnessMode = event.brightnessMode,
             message = "写入前权限失效，已暂停亮度写入",
-            lastError = "写入前权限失效"
+            lastError = "写入前权限失效",
+            failureReason = RuntimeFailureReason.PermissionMissing
+        )
+
+        is RuntimeEvent.ServiceBrightnessWriteFailed -> current.copy(
+            canWriteSettings = event.canWriteSettings,
+            brightnessMode = event.brightnessMode,
+            message = event.error,
+            lastError = event.error,
+            failureReason = if (event.canWriteSettings) {
+                RuntimeFailureReason.WriteFailed
+            } else {
+                RuntimeFailureReason.PermissionMissing
+            }
         )
 
         is RuntimeEvent.ServiceBrightnessWritten -> current.copy(
@@ -397,7 +443,8 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             appliedBrightnessValue = event.appliedBrightnessValue,
             canWriteSettings = true,
             brightnessMode = event.brightnessMode,
-            lastError = null
+            lastError = null,
+            failureReason = null
         )
 
         is RuntimeEvent.ActivePresetLoaded -> current.copy(
@@ -415,7 +462,14 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
         )
 
         is RuntimeEvent.AutoEnabledChanged -> current.copy(
-            autoControlDesired = event.desiredAutoControlEnabled
+            autoControlDesired = event.desiredAutoControlEnabled,
+            failureReason = if (!event.desiredAutoControlEnabled &&
+                current.failureReason == RuntimeFailureReason.PermissionMissing
+            ) {
+                null
+            } else {
+                current.failureReason
+            }
         )
 
         is RuntimeEvent.ServiceStartAnnounced -> current.copy(
@@ -433,7 +487,8 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             } else {
                 "光线传感器启动失败"
             },
-            lastError = if (event.started) null else "光线传感器启动失败"
+            lastError = if (event.started) null else "光线传感器启动失败",
+            failureReason = if (event.started) null else RuntimeFailureReason.NoSensor
         )
     }
     return next.copy(updatedAt = System.currentTimeMillis()).withResolvedStatus()
@@ -450,11 +505,3 @@ object BrightnessRuntimeState {
 
 private fun RuntimeSnapshot.withResolvedStatus(): RuntimeSnapshot =
     copy(status = resolvedRuntimeStatus())
-
-private fun RuntimeSnapshot.isWriteFailure(): Boolean {
-    if (lastError.isNullOrBlank()) return false
-    val text = "$lastError ${message.orEmpty()}"
-    return listOf("写入", "亮度曲线计算失败", "亮度曲线结果无效").any { token ->
-        text.contains(token)
-    }
-}
