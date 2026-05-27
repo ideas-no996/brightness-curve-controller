@@ -219,8 +219,13 @@ private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit)
             MetricRow("lastLuxUpdateTime", state.runtime.lastLuxUpdateTime?.let(::formatTime) ?: "-")
             MetricRow("autoDesired", state.settings.autoControlEnabled.toString())
             MetricRow("serviceRunning", state.runtime.isRunning.toString())
+            MetricRow("currentSystemBrightness", state.runtime.currentBrightnessValue?.toString() ?: "-")
+            MetricRow("currentBrightnessPercent", formatSystemBrightnessPercent(state.runtime.currentBrightnessValue))
             MetricRow("targetBrightnessPercent", state.runtime.targetPercent?.let { "%.0f%%".format(it) } ?: "-")
             MetricRow("appliedBrightnessValue", state.runtime.appliedBrightnessValue?.toString() ?: "-")
+            MetricRow("lastWriteTargetValue", state.runtime.lastWriteTargetValue?.toString() ?: "-")
+            MetricRow("lastWriteReadBackValue", state.runtime.lastWriteReadBackValue?.toString() ?: "-")
+            MetricRow("lastWriteSucceeded", state.runtime.lastWriteSucceeded?.toString() ?: "-")
             MetricRow("canWriteSettings", state.canWriteSettings.toString())
             MetricRow("brightnessMode", formatBrightnessMode(state.runtime.brightnessMode))
             MetricRow("failureReason", state.runtime.failureReason?.name ?: "-")
@@ -232,4 +237,9 @@ private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit)
             }
         }
     }
+}
+
+private fun formatSystemBrightnessPercent(value: Int?): String {
+    val brightness = value ?: return "-"
+    return "%.0f%%".format(brightness.coerceIn(0, 255) / 255f * 100f)
 }

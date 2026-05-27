@@ -5,6 +5,13 @@ import android.content.Context
 import android.provider.Settings
 import kotlin.math.roundToInt
 
+data class BrightnessWriteResult(
+    val targetPercent: Float,
+    val targetSystemValue: Int,
+    val readBackSystemValue: Int,
+    val brightnessMode: Int
+)
+
 class BrightnessController(private val context: Context) {
     private val resolver: ContentResolver = context.contentResolver
 
@@ -26,7 +33,9 @@ class BrightnessController(private val context: Context) {
         readBrightness().coerceIn(MIN_SYSTEM_BRIGHTNESS, MAX_SYSTEM_BRIGHTNESS) /
             MAX_SYSTEM_BRIGHTNESS.toFloat() * 100f
 
-    fun writeManualBrightness(percent: Float): Int {
+    fun writeManualBrightness(percent: Float): BrightnessWriteResult {
+        check(canWrite()) { "缺少修改系统设置权限" }
+
         val systemValue = percentToSystemValue(percent)
         val modeWritten = Settings.System.putInt(
             resolver,
@@ -38,8 +47,22 @@ class BrightnessController(private val context: Context) {
             Settings.System.SCREEN_BRIGHTNESS,
             systemValue
         )
-        check(modeWritten && brightnessWritten) { "系统拒绝写入亮度设置" }
-        return systemValue
+        val modeAfterWrite = readMode()
+        val readBack = readBrightness()
+
+        check(modeWritten && modeAfterWrite == Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL) {
+            "系统拒绝切换为手动亮度模式"
+        }
+        check(brightnessWritten && readBack == systemValue) {
+            "系统亮度回读不一致：目标 $systemValue，实际 $readBack"
+        }
+
+        return BrightnessWriteResult(
+            targetPercent = percent,
+            targetSystemValue = systemValue,
+            readBackSystemValue = readBack,
+            brightnessMode = modeAfterWrite
+        )
     }
 
     fun restore(mode: Int, brightness: Int) {
@@ -52,11 +75,11 @@ class BrightnessController(private val context: Context) {
     }
 
     companion object {
-        const val MIN_SYSTEM_BRIGHTNESS = 1
+        const val MIN_SYSTEM_BRIGHTNESS = 0
         const val MAX_SYSTEM_BRIGHTNESS = 255
 
         fun percentToSystemValue(percent: Float): Int =
-            (percent.coerceIn(1f, 100f) / 100f * MAX_SYSTEM_BRIGHTNESS)
+            (percent.coerceIn(0f, 100f) / 100f * MAX_SYSTEM_BRIGHTNESS)
                 .roundToInt()
                 .coerceIn(MIN_SYSTEM_BRIGHTNESS, MAX_SYSTEM_BRIGHTNESS)
     }

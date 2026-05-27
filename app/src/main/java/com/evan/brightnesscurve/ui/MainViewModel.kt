@@ -1,4 +1,5 @@
 package com.evan.brightnesscurve.ui
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -24,6 +25,7 @@ import com.evan.brightnesscurve.update.AppUpdateState
 import com.evan.brightnesscurve.update.UpdateChecker
 import com.evan.brightnesscurve.update.UpdateDownloader
 import com.evan.brightnesscurve.update.UpdateInstaller
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -155,7 +157,8 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
         BrightnessRuntimeState.dispatch(
             RuntimeEvent.PermissionRefreshed(
                 canWriteSettings = canWrite,
-                brightnessMode = readModeOrNull()
+                brightnessMode = readModeOrNull(),
+                currentBrightnessValue = readBrightnessOrNull()
             )
         )
         if (canWrite && uiState.value.settings.autoControlEnabled && !BrightnessRuntimeState.state.value.isRunning) {
@@ -341,7 +344,10 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
     }
 
     fun setComfortPercent(percent: Float) {
-        viewModelScope.launch { app.preferencesRepository.setLastComfortPercent(percent) }
+        viewModelScope.launch(Dispatchers.IO) {
+            app.preferencesRepository.setLastComfortPercent(percent)
+            writeSystemBrightness(percent, successMessage = null)
+        }
     }
 
     fun setMinAllowedPercent(percent: Float) {
@@ -373,8 +379,9 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
             uiState.value.settings.minAllowedPercent,
             uiState.value.settings.maxAllowedPercent
         )
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             app.preferencesRepository.setLastComfortPercent(next)
+            writeSystemBrightness(next, successMessage = "已写入系统亮度 ${next.toInt()}%")
             calibrateCurrentEnvironment(next)
         }
     }
@@ -557,6 +564,75 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
     private fun readModeOrNull(): Int? =
         runCatching { brightnessController.readMode() }.getOrNull()
 
+    private fun readBrightnessOrNull(): Int? =
+        runCatching { brightnessController.readBrightness() }.getOrNull()
+
+    private fun writeSystemBrightness(percent: Float, successMessage: String?) {
+        val targetSystemValue = BrightnessController.percentToSystemValue(percent)
+        val canWrite = BrightnessSettings.canWrite(app)
+        canWriteSettings.value = canWrite
+        if (!canWrite) {
+            BrightnessRuntimeState.dispatch(
+                RuntimeEvent.ServiceBrightnessWriteFailed(
+                    error = "缺少修改系统设置权限",
+                    targetSystemValue = targetSystemValue,
+                    canWriteSettings = false,
+                    brightnessMode = readModeOrNull(),
+                    currentBrightnessValue = readBrightnessOrNull()
+                )
+            )
+            message.value = "请先授予修改系统设置权限"
+            return
+        }
+
+        runCatching {
+            brightnessController.writeManualBrightness(percent)
+        }.onSuccess { result ->
+            Log.d(
+                TAG,
+                "manual targetPercent=${result.targetPercent}, " +
+                    "targetSystemBrightness=${result.targetSystemValue}, " +
+                    "canWriteSettings=true, brightnessMode=${result.brightnessMode}, " +
+                    "writeSuccess=true, readBackBrightness=${result.readBackSystemValue}"
+            )
+            BrightnessRuntimeState.dispatch(
+                RuntimeEvent.ServiceBrightnessWritten(
+                    writtenPercent = result.targetPercent,
+                    targetSystemValue = result.targetSystemValue,
+                    readBackSystemValue = result.readBackSystemValue,
+                    brightnessMode = result.brightnessMode
+                )
+            )
+            if (successMessage != null) {
+                message.value = successMessage
+            }
+        }.onFailure { throwable ->
+            val stillCanWrite = BrightnessSettings.canWrite(app)
+            val currentBrightness = readBrightnessOrNull()
+            val error = throwable.message ?: "亮度写入失败"
+            Log.e(
+                TAG,
+                "manual targetPercent=$percent, targetSystemBrightness=$targetSystemValue, " +
+                    "canWriteSettings=$stillCanWrite, brightnessMode=${readModeOrNull()}, " +
+                    "writeSuccess=false, readBackBrightness=$currentBrightness",
+                throwable
+            )
+            BrightnessRuntimeState.dispatch(
+                RuntimeEvent.ServiceBrightnessWriteFailed(
+                    error = error,
+                    targetSystemValue = targetSystemValue,
+                    canWriteSettings = stillCanWrite,
+                    brightnessMode = readModeOrNull(),
+                    currentBrightnessValue = currentBrightness
+                )
+            )
+            message.value = error
+        }
+    }
+
+    companion object {
+        private const val TAG = "MainViewModel"
+    }
 }
 
 class MainViewModelFactory(private val app: BrightnessCurveApp) : ViewModelProvider.Factory {

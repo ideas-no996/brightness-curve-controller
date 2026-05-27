@@ -20,7 +20,7 @@ object BrightnessSettings {
         Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, 128)
 
     fun readBrightnessPercent(resolver: ContentResolver): Float =
-        readBrightness(resolver).coerceIn(1, 255) / 255f * 100f
+        readBrightness(resolver).coerceIn(0, 255) / 255f * 100f
 
     fun writeManualBrightness(resolver: ContentResolver, percent: Float) {
         Settings.System.putInt(

@@ -73,7 +73,8 @@ class BrightnessControlService : Service() {
                     BrightnessRuntimeState.dispatch(
                         RuntimeEvent.ScreenTurnedOn(
                             brightnessMode = readModeOrNull(),
-                            appliedBrightnessValue = brightnessController.readBrightness()
+                            appliedBrightnessValue = brightnessController.readBrightness(),
+                            currentBrightnessValue = brightnessController.readBrightness()
                         )
                     )
                     scheduleLuxTimeout()
@@ -287,6 +288,14 @@ class BrightnessControlService : Service() {
 
         val targetPercent = decision.targetPercent
         val shouldWrite = decision.shouldWrite
+        val targetSystemValue = BrightnessController.percentToSystemValue(targetPercent)
+
+        Log.d(
+            TAG,
+            "lux=${decision.rawLux}, targetPercent=$targetPercent, " +
+                "targetSystemBrightness=$targetSystemValue, canWriteSettings=$canWrite, " +
+                "brightnessMode=$mode, shouldWrite=$shouldWrite, noWriteReason=${decision.noWriteReason}"
+        )
 
         BrightnessRuntimeState.dispatch(
             RuntimeEvent.ServiceLuxObserved(
@@ -317,33 +326,50 @@ class BrightnessControlService : Service() {
                 if (!brightnessController.canWrite()) {
                     BrightnessRuntimeState.dispatch(
                         RuntimeEvent.ServiceWritePermissionLost(
-                            brightnessMode = readModeOrNull()
+                            brightnessMode = readModeOrNull(),
+                            currentBrightnessValue = brightnessController.readBrightness()
                         )
                     )
                     return@withLock
                 }
                 runCatching {
                     brightnessController.writeManualBrightness(targetPercent)
-                }.onSuccess { appliedValue ->
-                    Log.d(TAG, "write brightness targetPercent=$targetPercent, systemValue=$appliedValue")
+                }.onSuccess { result ->
+                    Log.d(
+                        TAG,
+                        "lux=${decision.rawLux}, targetPercent=${result.targetPercent}, " +
+                            "targetSystemBrightness=${result.targetSystemValue}, " +
+                            "canWriteSettings=true, brightnessMode=${result.brightnessMode}, " +
+                            "writeSuccess=true, readBackBrightness=${result.readBackSystemValue}"
+                    )
                     lastWrittenPercent = targetPercent
                     lastWriteElapsed = SystemClock.elapsedRealtime()
                     BrightnessRuntimeState.dispatch(
                         RuntimeEvent.ServiceBrightnessWritten(
                             writtenPercent = targetPercent,
-                            appliedBrightnessValue = appliedValue,
-                            brightnessMode = readModeOrNull()
+                            targetSystemValue = result.targetSystemValue,
+                            readBackSystemValue = result.readBackSystemValue,
+                            brightnessMode = result.brightnessMode
                         )
                     )
                 }.onFailure { throwable ->
                     val canWrite = brightnessController.canWrite()
                     val error = throwable.message ?: "亮度写入失败"
-                    Log.e(TAG, "write brightness failed", throwable)
+                    Log.e(
+                        TAG,
+                        "lux=${decision.rawLux}, targetPercent=$targetPercent, " +
+                            "targetSystemBrightness=$targetSystemValue, " +
+                            "canWriteSettings=$canWrite, brightnessMode=${readModeOrNull()}, " +
+                            "writeSuccess=false, readBackBrightness=${brightnessController.readBrightness()}",
+                        throwable
+                    )
                     BrightnessRuntimeState.dispatch(
                         RuntimeEvent.ServiceBrightnessWriteFailed(
                             error = error,
+                            targetSystemValue = targetSystemValue,
                             canWriteSettings = canWrite,
-                            brightnessMode = readModeOrNull()
+                            brightnessMode = readModeOrNull(),
+                            currentBrightnessValue = brightnessController.readBrightness()
                         )
                     )
                 }
@@ -363,7 +389,8 @@ class BrightnessControlService : Service() {
                             presetName = preset.name,
                             appliedBrightnessValue = brightnessController.readBrightness(),
                             brightnessMode = readModeOrNull(),
-                            canWriteSettings = brightnessController.canWrite()
+                            canWriteSettings = brightnessController.canWrite(),
+                            currentBrightnessValue = brightnessController.readBrightness()
                         )
                     )
                 } else {
@@ -420,7 +447,8 @@ class BrightnessControlService : Service() {
                 started = started,
                 canWriteSettings = brightnessController.canWrite(),
                 brightnessMode = readModeOrNull(),
-                appliedBrightnessValue = brightnessController.readBrightness()
+                appliedBrightnessValue = brightnessController.readBrightness(),
+                currentBrightnessValue = brightnessController.readBrightness()
             )
         )
     }

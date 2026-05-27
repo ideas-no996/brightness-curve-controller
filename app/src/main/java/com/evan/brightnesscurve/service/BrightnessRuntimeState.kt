@@ -104,6 +104,10 @@ data class RuntimeSnapshot(
     val targetPercent: Float? = null,
     val writtenPercent: Float? = null,
     val appliedBrightnessValue: Int? = null,
+    val currentBrightnessValue: Int? = null,
+    val lastWriteTargetValue: Int? = null,
+    val lastWriteReadBackValue: Int? = null,
+    val lastWriteSucceeded: Boolean? = null,
     val canWriteSettings: Boolean? = null,
     val brightnessMode: Int? = null,
     val autoControlDesired: Boolean = false,
@@ -118,7 +122,8 @@ data class RuntimeSnapshot(
 sealed interface RuntimeEvent {
     data class PermissionRefreshed(
         val canWriteSettings: Boolean,
-        val brightnessMode: Int?
+        val brightnessMode: Int?,
+        val currentBrightnessValue: Int?
     ) : RuntimeEvent
 
     data class WindowBrightnessFallbackEnabled(
@@ -156,7 +161,8 @@ sealed interface RuntimeEvent {
 
     data class ScreenTurnedOn(
         val brightnessMode: Int?,
-        val appliedBrightnessValue: Int?
+        val appliedBrightnessValue: Int?,
+        val currentBrightnessValue: Int?
     ) : RuntimeEvent
 
     data class ServiceSensorUnavailable(
@@ -197,18 +203,22 @@ sealed interface RuntimeEvent {
     ) : RuntimeEvent
 
     data class ServiceWritePermissionLost(
-        val brightnessMode: Int?
+        val brightnessMode: Int?,
+        val currentBrightnessValue: Int?
     ) : RuntimeEvent
 
     data class ServiceBrightnessWriteFailed(
         val error: String,
+        val targetSystemValue: Int?,
         val canWriteSettings: Boolean,
-        val brightnessMode: Int?
+        val brightnessMode: Int?,
+        val currentBrightnessValue: Int?
     ) : RuntimeEvent
 
     data class ServiceBrightnessWritten(
         val writtenPercent: Float,
-        val appliedBrightnessValue: Int?,
+        val targetSystemValue: Int,
+        val readBackSystemValue: Int,
         val brightnessMode: Int?
     ) : RuntimeEvent
 
@@ -216,7 +226,8 @@ sealed interface RuntimeEvent {
         val presetName: String,
         val appliedBrightnessValue: Int?,
         val brightnessMode: Int?,
-        val canWriteSettings: Boolean
+        val canWriteSettings: Boolean,
+        val currentBrightnessValue: Int?
     ) : RuntimeEvent
 
     data object NoActivePresetConfigured : RuntimeEvent
@@ -233,7 +244,8 @@ sealed interface RuntimeEvent {
         val started: Boolean,
         val canWriteSettings: Boolean,
         val brightnessMode: Int?,
-        val appliedBrightnessValue: Int?
+        val appliedBrightnessValue: Int?,
+        val currentBrightnessValue: Int?
     ) : RuntimeEvent
 }
 
@@ -259,6 +271,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
         is RuntimeEvent.PermissionRefreshed -> current.copy(
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
+            currentBrightnessValue = event.currentBrightnessValue,
             windowFallbackActive = if (event.canWriteSettings) false else current.windowFallbackActive,
             failureReason = if (event.canWriteSettings && current.failureReason == RuntimeFailureReason.PermissionMissing) {
                 null
@@ -350,6 +363,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             isPausedForScreenOff = false,
             brightnessMode = event.brightnessMode,
             appliedBrightnessValue = event.appliedBrightnessValue,
+            currentBrightnessValue = event.currentBrightnessValue,
             message = "屏幕点亮，恢复控制"
         )
 
@@ -421,16 +435,24 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
         is RuntimeEvent.ServiceWritePermissionLost -> current.copy(
             canWriteSettings = false,
             brightnessMode = event.brightnessMode,
+            currentBrightnessValue = event.currentBrightnessValue,
             message = "写入前权限失效，已暂停亮度写入",
             lastError = "写入前权限失效",
+            lastWriteTargetValue = null,
+            lastWriteReadBackValue = event.currentBrightnessValue,
+            lastWriteSucceeded = false,
             failureReason = RuntimeFailureReason.PermissionMissing
         )
 
         is RuntimeEvent.ServiceBrightnessWriteFailed -> current.copy(
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
+            currentBrightnessValue = event.currentBrightnessValue,
             message = event.error,
             lastError = event.error,
+            lastWriteTargetValue = event.targetSystemValue,
+            lastWriteReadBackValue = event.currentBrightnessValue,
+            lastWriteSucceeded = false,
             failureReason = if (event.canWriteSettings) {
                 RuntimeFailureReason.WriteFailed
             } else {
@@ -440,7 +462,11 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         is RuntimeEvent.ServiceBrightnessWritten -> current.copy(
             writtenPercent = event.writtenPercent,
-            appliedBrightnessValue = event.appliedBrightnessValue,
+            appliedBrightnessValue = event.readBackSystemValue,
+            currentBrightnessValue = event.readBackSystemValue,
+            lastWriteTargetValue = event.targetSystemValue,
+            lastWriteReadBackValue = event.readBackSystemValue,
+            lastWriteSucceeded = true,
             canWriteSettings = true,
             brightnessMode = event.brightnessMode,
             lastError = null,
@@ -450,6 +476,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
         is RuntimeEvent.ActivePresetLoaded -> current.copy(
             activePresetName = event.presetName,
             appliedBrightnessValue = event.appliedBrightnessValue,
+            currentBrightnessValue = event.currentBrightnessValue,
             brightnessMode = event.brightnessMode,
             canWriteSettings = event.canWriteSettings,
             message = "已加载预设：${event.presetName}"
@@ -482,6 +509,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,
             appliedBrightnessValue = event.appliedBrightnessValue,
+            currentBrightnessValue = event.currentBrightnessValue,
             message = if (event.started) {
                 "亮度控制已启动，正在读取环境光"
             } else {

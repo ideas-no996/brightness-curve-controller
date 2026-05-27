@@ -126,8 +126,10 @@ class RuntimeStatusTest {
             RuntimeSnapshot(isRunning = true, canWriteSettings = true),
             RuntimeEvent.ServiceBrightnessWriteFailed(
                 error = "系统拒绝写入亮度设置",
+                targetSystemValue = 128,
                 canWriteSettings = true,
-                brightnessMode = 0
+                brightnessMode = 0,
+                currentBrightnessValue = 120
             )
         )
 
@@ -141,12 +143,33 @@ class RuntimeStatusTest {
             RuntimeSnapshot(isRunning = true, canWriteSettings = true),
             RuntimeEvent.ServiceBrightnessWriteFailed(
                 error = "写入失败",
+                targetSystemValue = 128,
                 canWriteSettings = false,
-                brightnessMode = 0
+                brightnessMode = 0,
+                currentBrightnessValue = 120
             )
         )
 
         assertEquals(RuntimeFailureReason.PermissionMissing, snapshot.failureReason)
         assertEquals(RuntimeStatus.PermissionMissing, snapshot.status)
+    }
+
+    @Test
+    fun `successful brightness write records target and read back values`() {
+        val snapshot = reduceRuntimeSnapshot(
+            RuntimeSnapshot(isRunning = true, canWriteSettings = true),
+            RuntimeEvent.ServiceBrightnessWritten(
+                writtenPercent = 50f,
+                targetSystemValue = 128,
+                readBackSystemValue = 128,
+                brightnessMode = 0
+            )
+        )
+
+        assertEquals(50f, snapshot.writtenPercent)
+        assertEquals(128, snapshot.lastWriteTargetValue)
+        assertEquals(128, snapshot.lastWriteReadBackValue)
+        assertEquals(true, snapshot.lastWriteSucceeded)
+        assertEquals(null, snapshot.lastError)
     }
 }
