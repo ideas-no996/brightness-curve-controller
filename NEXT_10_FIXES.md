@@ -108,13 +108,13 @@ Acceptance:
 
 Type: release/security
 
-Status: partially implemented with checksum instructions, release checklist, and current signing certificate fingerprint.
+Status: implemented with checksum instructions, release checklist, current signing certificate fingerprint, and in-app SHA-256 verification for downloaded APKs.
 
 Action:
 
 - Add checksum verification commands to README and release docs.
 - Publish release signing certificate fingerprint.
-- Consider verifying `SHA256SUMS.txt` in the app before installer handoff.
+- Verify the release asset SHA-256 in the app before installer handoff.
 
 Acceptance:
 

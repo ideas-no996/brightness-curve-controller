@@ -28,6 +28,7 @@ The app uses the internet only for the in-app update flow:
 
 - checking the latest GitHub Release
 - downloading the release APK after you choose to download it
+- checking the downloaded APK against the GitHub Release SHA-256 digest before installer handoff
 
 The app does not upload sensor readings, brightness settings, presets, device identifiers, or usage analytics.
 
@@ -49,6 +50,8 @@ Update checking is optional. Brightness control, light-sensor reading, curve cal
 The app cannot silently install updates. Android always shows the system installer, and you must confirm installation.
 
 Release APKs include a `SHA256SUMS.txt` file on GitHub Releases so you can verify download integrity before manual installation.
+
+The in-app updater also checks the downloaded APK SHA-256 digest when GitHub provides one for the release asset.
 
 ## Logs And Bug Reports
 

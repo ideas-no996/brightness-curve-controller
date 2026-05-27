@@ -67,4 +67,5 @@ Verify the APK SHA-256 with SHA256SUMS.txt. The release APK should be signed wit
 - Release notes imply compatibility that the matrix does not prove.
 - The release APK is unsigned or signed with an unexpected certificate.
 - The APK asset exists but `SHA256SUMS.txt` is missing.
+- GitHub Release asset digest is missing or does not match the APK.
 - A known critical regression is unresolved and undocumented.

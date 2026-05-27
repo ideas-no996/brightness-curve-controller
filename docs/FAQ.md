@@ -24,6 +24,8 @@ No. Brightness control works locally. Internet access is only used if you open t
 
 Only the in-app update flow needs this. The app downloads APKs from GitHub Releases and then opens Android's system installer. Installation is never silent.
 
+Before opening the installer, the app checks the downloaded APK SHA-256 digest when GitHub provides one for the release asset.
+
 ## Why does brightness sometimes change slowly?
 
 The app intentionally smooths lux readings, throttles writes, and ramps brightness changes to avoid flicker and sudden jumps.

@@ -7,7 +7,8 @@ data class UpdateInfo(
     val releaseUrl: String,
     val apkName: String,
     val apkDownloadUrl: String,
-    val apkSizeBytes: Long
+    val apkSizeBytes: Long,
+    val apkSha256: String? = null
 )
 
 data class AppUpdateState(
@@ -27,4 +28,3 @@ data class AppUpdateState(
     val isDownloaded: Boolean
         get() = downloadedApkPath != null
 }
-

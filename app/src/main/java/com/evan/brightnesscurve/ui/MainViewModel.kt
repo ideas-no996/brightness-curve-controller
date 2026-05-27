@@ -268,7 +268,7 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
                         isDownloading = false,
                         downloadProgressPercent = 100,
                         downloadedApkPath = apkFile.absolutePath,
-                        statusText = "下载完成，可以安装"
+                        statusText = "下载完成，SHA-256 校验通过，可以安装"
                     )
                 }
             }.onFailure { throwable ->

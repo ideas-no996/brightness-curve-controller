@@ -118,7 +118,7 @@ internal fun SettingsTab(
                     val latest = update.latest
 
                     Text("软件更新", style = MaterialTheme.typography.titleMedium)
-                    Text("联网仅用于手动检查 GitHub Release 和下载 APK；亮度控制本身离线工作，安装更新也必须经过 Android 系统确认。")
+                    Text("联网仅用于手动检查 GitHub Release、下载并校验 APK；亮度控制本身离线工作，安装更新也必须经过 Android 系统确认。")
                     MetricRow("当前版本", update.currentVersionName)
                     MetricRow("更新状态", update.statusText)
                     update.lastCheckedAt?.let {
@@ -129,6 +129,7 @@ internal fun SettingsTab(
                         MetricRow("最新版本", latest.versionName)
                         MetricRow("发布时间", formatReleaseTime(latest.publishedAt))
                         MetricRow("安装包", formatFileSize(latest.apkSizeBytes))
+                        MetricRow("APK 校验", if (latest.apkSha256 == null) "缺失" else "SHA-256")
                     }
 
                     if (update.isDownloading) {

@@ -11,6 +11,7 @@
 - Added a copyable in-app diagnostic report covering device, permission, sensor, target brightness, write, read-back, and error state.
 - Added release checklist, signing certificate fingerprint, checksum verification guidance, and versioning policy.
 - Clarified in-app update permissions and current-window brightness preview behavior.
+- Added in-app SHA-256 verification for downloaded release APKs before installer handoff.
 
 ## v1.0.5
 

@@ -30,7 +30,8 @@ class UpdateChecker(
             releaseUrl = release.htmlUrl,
             apkName = asset.name,
             apkDownloadUrl = asset.downloadUrl,
-            apkSizeBytes = asset.size
+            apkSizeBytes = asset.size,
+            apkSha256 = normalizeSha256Digest(asset.digest)
         )
     }
 
@@ -70,8 +71,19 @@ private data class GitHubReleaseResponse(
 private data class GitHubReleaseAsset(
     val name: String,
     val size: Long = 0,
+    val digest: String? = null,
     @SerialName("browser_download_url") val downloadUrl: String
 )
+
+internal fun normalizeSha256Digest(value: String?): String? {
+    val digest = value
+        ?.trim()
+        ?.removePrefix("sha256:")
+        ?.removePrefix("SHA256:")
+        ?.lowercase()
+        ?: return null
+    return digest.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+}
 
 private inline fun <T : HttpURLConnection, R> T.use(block: (T) -> R): R {
     return try {
@@ -80,4 +92,3 @@ private inline fun <T : HttpURLConnection, R> T.use(block: (T) -> R): R {
         disconnect()
     }
 }
-
