@@ -65,10 +65,18 @@ fun MainScreen(
         onDismissMessage()
     }
 
-    LaunchedEffect(state.settings.hasSeenTutorial, state.settings.showTutorialOnStartup) {
-        if (!tutorialAutoChecked) {
+    LaunchedEffect(
+        state.settingsLoaded,
+        state.settings.hasSeenTutorial,
+        state.settings.showTutorialOnStartup
+    ) {
+        if (state.settingsLoaded && !tutorialAutoChecked) {
             tutorialAutoChecked = true
-            tutorialVisible = state.settings.showTutorialOnStartup || !state.settings.hasSeenTutorial
+            tutorialVisible = shouldAutoShowTutorial(
+                settingsLoaded = state.settingsLoaded,
+                hasSeenTutorial = state.settings.hasSeenTutorial,
+                showTutorialOnStartup = state.settings.showTutorialOnStartup
+            )
         }
     }
 
@@ -156,3 +164,9 @@ fun MainScreen(
         )
     }
 }
+
+internal fun shouldAutoShowTutorial(
+    settingsLoaded: Boolean,
+    hasSeenTutorial: Boolean,
+    showTutorialOnStartup: Boolean
+): Boolean = settingsLoaded && (showTutorialOnStartup || !hasSeenTutorial)

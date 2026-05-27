@@ -108,7 +108,7 @@ class AppPreferencesRepository(private val context: Context) {
     suspend fun setShowTutorialOnStartup(enabled: Boolean) {
         context.brightnessDataStore.edit { prefs ->
             prefs[Keys.ShowTutorialOnStartup] = enabled
-            if (enabled) prefs[Keys.HasSeenTutorial] = true
+            prefs[Keys.HasSeenTutorial] = true
         }
     }
 

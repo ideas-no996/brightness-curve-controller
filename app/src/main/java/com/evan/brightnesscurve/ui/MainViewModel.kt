@@ -55,6 +55,7 @@ data class MainUiState(
         hasSeenTutorial = false,
         showTutorialOnStartup = true
     ),
+    val settingsLoaded: Boolean = false,
     val canWriteSettings: Boolean = false,
     val updateState: AppUpdateState = AppUpdateState(
         currentVersionName = BuildConfig.VERSION_NAME,
@@ -137,6 +138,7 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
             revisions = base.revisions,
             runtime = base.runtime,
             settings = settings,
+            settingsLoaded = true,
             canWriteSettings = canWrite,
             updateState = updateState,
             message = message

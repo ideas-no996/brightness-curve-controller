@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.5
+
+This release fixes the tutorial overlay so the "do not show again" choice is respected after restarting the app.
+
+### Fixes
+
+- Waits for persisted settings to load before deciding whether to auto-show the tutorial on startup.
+- Prevents the ViewModel's initial default tutorial settings from triggering the tutorial before DataStore emits the saved opt-out value.
+- Records the tutorial as handled when the startup tutorial switch is changed, so disabling it in Settings also prevents first-run auto-show.
+- Adds tests for first-run tutorial visibility, saved opt-out behavior, and explicit startup tutorial opt-in.
+
 ## v1.0.4
 
 This release fixes a critical regression in the core system-brightness control path. It restores the full ambient-light to curve calculation to system brightness write-back loop.
