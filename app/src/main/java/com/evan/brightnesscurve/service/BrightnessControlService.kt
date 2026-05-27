@@ -21,14 +21,13 @@ import com.evan.brightnesscurve.BrightnessCurveApp
 import com.evan.brightnesscurve.MainActivity
 import com.evan.brightnesscurve.R
 import com.evan.brightnesscurve.brightness.BrightnessController
-import com.evan.brightnesscurve.brightness.BrightnessMapping
-import com.evan.brightnesscurve.brightness.BrightnessRamp
 import com.evan.brightnesscurve.data.BrightnessPreset
 import com.evan.brightnesscurve.data.ResponseSpeed
+import com.evan.brightnesscurve.engine.BrightnessCurveEngine
+import com.evan.brightnesscurve.engine.NoWriteReason
 import com.evan.brightnesscurve.sensor.LightSensorSample
 import com.evan.brightnesscurve.sensor.LightSensorMonitor
 import com.evan.brightnesscurve.sensor.LightSensorStatus
-import com.evan.brightnesscurve.sensor.LuxSmoother
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,8 +52,7 @@ class BrightnessControlService : Service() {
     private var minAllowedPercent: Float = 3f
     private var maxAllowedPercent: Float = 100f
     private var responseSpeed: ResponseSpeed = ResponseSpeed.Standard
-    private var luxSmoother = LuxSmoother(responseSpeed.alpha)
-    private var brightnessRamp = BrightnessRamp(responseSpeed.brightenStep, responseSpeed.darkenStep)
+    private val brightnessEngine = BrightnessCurveEngine()
     private var lastWrittenPercent: Float? = null
     private var lastWriteElapsed: Long = 0L
     private var isScreenOn: Boolean = true
@@ -70,7 +68,7 @@ class BrightnessControlService : Service() {
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     isScreenOn = true
-                    luxSmoother.reset()
+                    brightnessEngine.reset()
                     lastWrittenPercent = brightnessController.readBrightnessPercent()
                     BrightnessRuntimeState.dispatch(
                         RuntimeEvent.ScreenTurnedOn(
@@ -182,16 +180,16 @@ class BrightnessControlService : Service() {
         val preset = currentPreset
 
         val now = SystemClock.elapsedRealtime()
-        val smoothedLux = luxSmoother.onSample(rawLux)
         val mode = readModeOrNull()
         val canWrite = brightnessController.canWrite()
 
         Log.d(
             TAG,
-            "service lux=$rawLux, smoothed=$smoothedLux, sensor=${sample.sensorName}, preset=${preset?.name}, canWrite=$canWrite, mode=$mode"
+            "service lux=$rawLux, sensor=${sample.sensorName}, preset=${preset?.name}, canWrite=$canWrite, mode=$mode"
         )
 
         if (preset == null) {
+            val smoothedLux = brightnessEngine.observeLux(rawLux, responseSpeed)
             BrightnessRuntimeState.dispatch(
                 RuntimeEvent.ServiceLuxObserved(
                     rawLux = rawLux,
@@ -212,6 +210,7 @@ class BrightnessControlService : Service() {
         }
 
         if (!isScreenOn) {
+            val smoothedLux = brightnessEngine.observeLux(rawLux, responseSpeed)
             BrightnessRuntimeState.dispatch(
                 RuntimeEvent.ServiceLuxObserved(
                     rawLux = rawLux,
@@ -232,20 +231,24 @@ class BrightnessControlService : Service() {
         }
 
         val maxAllowed = if (allowOutdoorFull) maxAllowedPercent else maxAllowedPercent.coerceAtMost(85f)
-        val mappedPercent = runCatching {
-            BrightnessMapping.targetPercent(
-                lux = smoothedLux,
+        val decision = runCatching {
+            brightnessEngine.decide(
+                rawLux = rawLux,
                 points = preset.points,
                 minPercent = minAllowedPercent,
-                maxPercent = maxAllowed
+                maxPercent = maxAllowed,
+                responseSpeed = responseSpeed,
+                lastWrittenPercent = lastWrittenPercent,
+                nowElapsedMillis = now,
+                lastWriteElapsedMillis = lastWriteElapsed
             )
         }.getOrElse { throwable ->
             val error = throwable.message ?: "亮度曲线计算失败"
-            Log.e(TAG, "target mapping failed", throwable)
+            Log.e(TAG, "brightness decision failed", throwable)
             BrightnessRuntimeState.dispatch(
                 RuntimeEvent.ServiceLuxObserved(
                     rawLux = rawLux,
-                    smoothedLux = smoothedLux,
+                    smoothedLux = brightnessEngine.currentSmoothedLux() ?: rawLux,
                     receivedAtMillis = sample.receivedAtMillis,
                     sensorName = sample.sensorName,
                     activePresetName = preset.name,
@@ -261,12 +264,12 @@ class BrightnessControlService : Service() {
             return
         }
 
-        if (mappedPercent.isNaN() || mappedPercent.isInfinite()) {
+        if (decision.mappedPercent.isNaN() || decision.mappedPercent.isInfinite()) {
             val error = "亮度曲线结果无效"
             BrightnessRuntimeState.dispatch(
                 RuntimeEvent.ServiceLuxObserved(
                     rawLux = rawLux,
-                    smoothedLux = smoothedLux,
+                    smoothedLux = decision.smoothedLux,
                     receivedAtMillis = sample.receivedAtMillis,
                     sensorName = sample.sensorName,
                     activePresetName = preset.name,
@@ -282,14 +285,13 @@ class BrightnessControlService : Service() {
             return
         }
 
-        val (targetPercent, rampShouldWrite) = brightnessRamp.next(lastWrittenPercent, mappedPercent)
-        val canWriteByTime = now - lastWriteElapsed >= MIN_WRITE_INTERVAL_MS
-        val shouldWrite = rampShouldWrite && canWriteByTime
+        val targetPercent = decision.targetPercent
+        val shouldWrite = decision.shouldWrite
 
         BrightnessRuntimeState.dispatch(
             RuntimeEvent.ServiceLuxObserved(
                 rawLux = rawLux,
-                smoothedLux = smoothedLux,
+                smoothedLux = decision.smoothedLux,
                 receivedAtMillis = sample.receivedAtMillis,
                 sensorName = sample.sensorName,
                 activePresetName = preset.name,
@@ -300,7 +302,7 @@ class BrightnessControlService : Service() {
                 message = when {
                     !canWrite -> "已读取环境光，但缺少写入亮度权限"
                     shouldWrite -> "正在柔和调整亮度"
-                    !canWriteByTime -> "已感知光线变化，等待节流窗口"
+                    decision.noWriteReason == NoWriteReason.Throttled -> "已感知光线变化，等待节流窗口"
                     else -> "变化较小，保持当前亮度"
                 },
                 lastError = if (canWrite) null else "缺少修改系统设置权限",
@@ -354,7 +356,7 @@ class BrightnessControlService : Service() {
             app.presetRepository.observeActivePreset().collectLatest { preset ->
                 currentPreset = preset
                 if (preset != null) {
-                    luxSmoother.reset()
+                    brightnessEngine.reset()
                     lastWrittenPercent = brightnessController.readBrightnessPercent()
                     BrightnessRuntimeState.dispatch(
                         RuntimeEvent.ActivePresetLoaded(
@@ -376,11 +378,7 @@ class BrightnessControlService : Service() {
                 minAllowedPercent = settings.minAllowedPercent
                 maxAllowedPercent = settings.maxAllowedPercent
                 responseSpeed = settings.responseSpeed
-                luxSmoother = LuxSmoother(responseSpeed.alpha)
-                brightnessRamp = BrightnessRamp(
-                    brightenStepPercent = responseSpeed.brightenStep,
-                    darkenStepPercent = responseSpeed.darkenStep
-                )
+                brightnessEngine.reset()
                 BrightnessRuntimeState.dispatch(
                     RuntimeEvent.AutoEnabledChanged(
                         desiredAutoControlEnabled = settings.autoControlEnabled
@@ -495,7 +493,6 @@ class BrightnessControlService : Service() {
         private const val TAG = "BrightnessControlService"
         private const val CHANNEL_ID = "brightness_curve_controller"
         private const val NOTIFICATION_ID = 20
-        private const val MIN_WRITE_INTERVAL_MS = 220L
         private const val LUX_TIMEOUT_MS = 5_000L
     }
 }
