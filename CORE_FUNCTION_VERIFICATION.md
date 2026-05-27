@@ -202,7 +202,7 @@ A device passes only if all of these are true:
 - `SCREEN_BRIGHTNESS` write succeeds.
 - Read-back matches or the documented device-specific tolerance accepts it.
 - UI shows auto adjusting or a specific failure state.
-- If any step fails, the UI and exported report name the failing step.
+- If any step fails, the UI and copied diagnostic report name the failing step.
 
 ## Fail Criteria
 
@@ -214,6 +214,18 @@ A device fails if any of these happen:
 - Brightness write fails silently.
 - App only changes current window brightness while presenting it as system brightness.
 - User cannot produce enough diagnostics to explain the failure.
+
+## In-App Diagnostic Report
+
+Settings -> Diagnostics includes a "复制诊断报告" action. The report is copied locally to the clipboard and is not uploaded. It includes:
+
+- app version and settings load state
+- device manufacturer, model, Android version, SDK, and fingerprint
+- permission and brightness mode
+- current brightness, target percent, last write target, read-back value, and write success
+- raw lux, smoothed lux, light sensor name, registration state, and timeout state
+- service running state, active preset, runtime message, and last error
+- update permission/status fields
 
 ## Required Next Artifact
 

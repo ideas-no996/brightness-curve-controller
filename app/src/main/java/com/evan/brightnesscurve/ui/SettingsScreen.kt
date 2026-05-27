@@ -21,6 +21,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.evan.brightnesscurve.data.ResponseSpeed
 import com.evan.brightnesscurve.service.RuntimeStatus
@@ -208,6 +210,8 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onCheckedChange: (
 
 @Composable
 private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit) {
+    val clipboardManager = LocalClipboardManager.current
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("诊断", style = MaterialTheme.typography.titleMedium)
@@ -230,6 +234,14 @@ private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit)
             MetricRow("brightnessMode", formatBrightnessMode(state.runtime.brightnessMode))
             MetricRow("failureReason", state.runtime.failureReason?.name ?: "-")
             MetricRow("lastError", state.runtime.lastError ?: "-")
+            OutlinedButton(
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(buildDiagnosticReport(state)))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("复制诊断报告")
+            }
             if (state.runtime.status == RuntimeStatus.SensorTimeout) {
                 OutlinedButton(onClick = onRetryLightSensor, modifier = Modifier.fillMaxWidth()) {
                     Text("重试检测")

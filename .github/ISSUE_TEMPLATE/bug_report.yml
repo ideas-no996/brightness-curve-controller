@@ -60,8 +60,8 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: Paste or screenshot Settings -> Diagnostics if possible. Include the write target and read-back fields for brightness bugs.
-      placeholder: "runtimeStatus, hasLightSensor, sensorName, lastLux, targetBrightnessPercent, currentSystemBrightness, lastWriteTargetValue, lastWriteReadBackValue, lastWriteSucceeded, canWriteSettings, brightnessMode, failureReason, lastError"
+      description: Paste the copied Settings -> Diagnostics report if possible. Include the write target and read-back fields for brightness bugs.
+      placeholder: "Use Settings -> Diagnostics -> Copy diagnostic report, or paste runtimeStatus, hasLightSensor, sensorName, lastLux, targetBrightnessPercent, currentSystemBrightness, lastWriteTargetValue, lastWriteReadBackValue, lastWriteSucceeded, canWriteSettings, brightnessMode, failureReason, lastError"
   - type: dropdown
     id: verification_level
     attributes:

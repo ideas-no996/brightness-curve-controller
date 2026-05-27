@@ -70,6 +70,8 @@
 - 最近一次 lux、目标亮度、写入目标值和回读值。
 - 如果写入失败，UI 是否显示具体原因。
 
+设置页的诊断区域提供“复制诊断报告”，会把设备、版本、权限、传感器、目标亮度、写入值、回读值和错误状态复制为纯文本。提交 issue 时请优先粘贴这份报告。
+
 完整验收清单见 [CORE_FUNCTION_VERIFICATION.md](CORE_FUNCTION_VERIFICATION.md)。严格审计和后续修复计划见 [STRICT_REVIEW.md](STRICT_REVIEW.md) 与 [NEXT_10_FIXES.md](NEXT_10_FIXES.md)。
 
 ## 快速开始

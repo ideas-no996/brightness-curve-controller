@@ -38,7 +38,7 @@ Please include device model, Android version, vendor skin, whether `WRITE_SETTIN
 
 ## Permission is granted but brightness still does not change. What should I check?
 
-Check Settings -> Diagnostics:
+Check Settings -> Diagnostics and use "复制诊断报告" when filing an issue. Key fields:
 
 - `canWriteSettings`
 - `brightnessMode`

@@ -60,6 +60,8 @@ Acceptance:
 
 Type: app code
 
+Status: implemented in the Settings diagnostics panel; still needs real issue-report feedback.
+
 Action:
 
 - Add "Copy diagnostic report" in Settings diagnostics.
