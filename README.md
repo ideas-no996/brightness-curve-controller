@@ -144,6 +144,8 @@ App 设置页的“软件更新”会读取最新 GitHub Release，并查找这�
 
 更详细的一步一步说明见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+版本修改记录见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 项目结构
 
 ```text

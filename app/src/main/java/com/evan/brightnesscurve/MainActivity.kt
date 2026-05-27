@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -53,6 +54,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(
+                uiState.runtime.targetPercent,
+                uiState.runtime.windowFallbackActive,
+                uiState.canWriteSettings
+            ) {
+                val attributes = window.attributes
+                val targetPercent = uiState.runtime.targetPercent
+                attributes.screenBrightness =
+                    if (!uiState.canWriteSettings &&
+                        uiState.runtime.windowFallbackActive &&
+                        targetPercent != null
+                    ) {
+                        (targetPercent / 100f).coerceIn(0.01f, 1f)
+                    } else {
+                        WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    }
+                window.attributes = attributes
+            }
+
             BrightnessAppTheme {
                 MainScreen(
                     state = uiState,
@@ -66,6 +86,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onToggleService = { enabled ->
                         if (enabled && !BrightnessSettings.canWrite(context)) {
+                            viewModel.enableWindowBrightnessFallback()
                             viewModel.refreshWritePermission()
                             val intent = Intent(
                                 Settings.ACTION_MANAGE_WRITE_SETTINGS,
@@ -98,6 +119,7 @@ class MainActivity : ComponentActivity() {
                         installPermissionLauncher.launch(UpdateInstaller.unknownAppSourcesIntent(context))
                     },
                     onRefreshInstallPermission = viewModel::refreshInstallPermission,
+                    onRetryLightSensor = viewModel::retryLightSensorDetection,
                     onQuickCalibrate = viewModel::quickCalibrate,
                     onCalibrate = viewModel::calibrateCurrentEnvironment,
                     onActivatePreset = viewModel::activatePreset,

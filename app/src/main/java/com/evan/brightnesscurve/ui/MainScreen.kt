@@ -77,6 +77,7 @@ fun MainScreen(
     onInstallUpdate: () -> Unit,
     onOpenInstallPermission: () -> Unit,
     onRefreshInstallPermission: () -> Unit,
+    onRetryLightSensor: () -> Unit,
     onQuickCalibrate: (Float) -> Unit,
     onCalibrate: () -> Unit,
     onActivatePreset: (Long) -> Unit,
@@ -133,6 +134,7 @@ fun MainScreen(
                 onOpenWriteSettings = onOpenWriteSettings,
                 onToggleService = onToggleService,
                 onComfortPercentChange = onComfortPercentChange,
+                onRetryLightSensor = onRetryLightSensor,
                 onQuickCalibrate = onQuickCalibrate,
                 onCalibrate = onCalibrate
             )
@@ -171,7 +173,8 @@ fun MainScreen(
                 onDownloadUpdate = onDownloadUpdate,
                 onInstallUpdate = onInstallUpdate,
                 onOpenInstallPermission = onOpenInstallPermission,
-                onRefreshInstallPermission = onRefreshInstallPermission
+                onRefreshInstallPermission = onRefreshInstallPermission,
+                onRetryLightSensor = onRetryLightSensor
             )
         }
     }
@@ -198,6 +201,7 @@ private fun HomeTab(
     onOpenWriteSettings: () -> Unit,
     onToggleService: (Boolean) -> Unit,
     onComfortPercentChange: (Float) -> Unit,
+    onRetryLightSensor: () -> Unit,
     onQuickCalibrate: (Float) -> Unit,
     onCalibrate: () -> Unit
 ) {
@@ -230,18 +234,23 @@ private fun HomeTab(
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(environmentLabel(state.runtime.smoothedLux ?: state.runtime.rawLux), style = MaterialTheme.typography.headlineSmall)
+                    Text(environmentTitle(state), style = MaterialTheme.typography.headlineSmall)
                     Text(brightnessFeeling(state.runtime.writtenPercent ?: state.runtime.targetPercent), color = MaterialTheme.colorScheme.secondary)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
                             Text(state.activePreset?.name ?: "护眼室内", style = MaterialTheme.typography.titleMedium)
-                            Text(if (state.runtime.isRunning) "正在自动照顾屏幕亮度" else "自动控制未开启")
+                            Text(controlStatus(state))
                         }
                         Switch(
                             checked = state.settings.serviceEnabled || state.runtime.isRunning,
                             onCheckedChange = onToggleService,
-                            enabled = state.canWriteSettings
+                            enabled = true
                         )
+                    }
+                    if (state.runtime.lightSensorTimedOut) {
+                        OutlinedButton(onClick = onRetryLightSensor, modifier = Modifier.fillMaxWidth()) {
+                            Text("重试检测")
+                        }
                     }
                 }
             }
@@ -280,7 +289,7 @@ private fun HomeTab(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("自动曲线", style = MaterialTheme.typography.titleMedium)
                     MetricRow("当前环境", environmentLabel(state.runtime.smoothedLux ?: state.runtime.rawLux))
-                    MetricRow("目标亮度", state.runtime.targetPercent?.let { "%.0f%%".format(it) } ?: "等待传感器")
+                    MetricRow("目标亮度", state.runtime.targetPercent?.let { "%.0f%%".format(it) } ?: "等待环境光")
                     MetricRow("曲线状态", if (state.activePreset?.isBuiltIn == false) "已学习" else "默认曲线")
                     state.runtime.message?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
                 }
@@ -310,7 +319,8 @@ private fun SettingsTab(
     onDownloadUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
     onOpenInstallPermission: () -> Unit,
-    onRefreshInstallPermission: () -> Unit
+    onRefreshInstallPermission: () -> Unit,
+    onRetryLightSensor: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -331,6 +341,10 @@ private fun SettingsTab(
                     }
                 }
             }
+        }
+
+        item {
+            DiagnosticsPanel(state = state, onRetryLightSensor = onRetryLightSensor)
         }
 
         item {
@@ -681,6 +695,31 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onCheckedChange: (
 }
 
 @Composable
+private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("诊断", style = MaterialTheme.typography.titleMedium)
+            MetricRow("hasLightSensor", formatNullableBoolean(state.runtime.hasLightSensor))
+            MetricRow("sensorRegistered", state.runtime.lightSensorRegistered.toString())
+            MetricRow("sensorName", state.runtime.lightSensorName ?: "-")
+            MetricRow("lastLux", state.runtime.lastLux?.let { "%.1f lux".format(it) } ?: "-")
+            MetricRow("lastLuxUpdateTime", state.runtime.lastLuxUpdateTime?.let(::formatTime) ?: "-")
+            MetricRow("autoEnabled", (state.settings.serviceEnabled || state.runtime.autoEnabled).toString())
+            MetricRow("targetBrightnessPercent", state.runtime.targetPercent?.let { "%.0f%%".format(it) } ?: "-")
+            MetricRow("appliedBrightnessValue", state.runtime.appliedBrightnessValue?.toString() ?: "-")
+            MetricRow("canWriteSettings", state.canWriteSettings.toString())
+            MetricRow("brightnessMode", formatBrightnessMode(state.runtime.brightnessMode))
+            MetricRow("lastError", state.runtime.lastError ?: "-")
+            if (state.runtime.lightSensorTimedOut) {
+                OutlinedButton(onClick = onRetryLightSensor, modifier = Modifier.fillMaxWidth()) {
+                    Text("重试检测")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TutorialOverlay(
     onSkip: () -> Unit,
     onFinish: (Boolean) -> Unit
@@ -778,13 +817,36 @@ private fun DebugInfoPanel(state: MainUiState) {
             }
             if (expanded) {
                 MetricRow("当前预设", state.activePreset?.name ?: "未初始化")
+                MetricRow("hasLightSensor", formatNullableBoolean(state.runtime.hasLightSensor))
+                MetricRow("sensorName", state.runtime.lightSensorName ?: "-")
+                MetricRow("sensorRegistered", state.runtime.lightSensorRegistered.toString())
                 MetricRow("raw lux", state.runtime.rawLux?.let { "%.1f".format(it) } ?: "-")
                 MetricRow("smoothed lux", state.runtime.smoothedLux?.let { "%.1f".format(it) } ?: "-")
+                MetricRow("lastLuxUpdateTime", state.runtime.lastLuxUpdateTime?.let(::formatTime) ?: "-")
+                MetricRow("autoEnabled", (state.settings.serviceEnabled || state.runtime.autoEnabled).toString())
                 MetricRow("target", state.runtime.targetPercent?.let { "%.0f%%".format(it) } ?: "-")
                 MetricRow("written", state.runtime.writtenPercent?.let { "%.0f%%".format(it) } ?: "-")
+                MetricRow("applied", state.runtime.appliedBrightnessValue?.toString() ?: "-")
+                MetricRow("canWrite", state.canWriteSettings.toString())
+                MetricRow("brightnessMode", formatBrightnessMode(state.runtime.brightnessMode))
+                MetricRow("lastError", state.runtime.lastError ?: "-")
                 MetricRow("response", state.settings.responseSpeed.label)
             }
         }
+    }
+}
+
+private fun environmentTitle(state: MainUiState): String {
+    if (state.runtime.lightSensorTimedOut) return "未收到环境光数据"
+    return environmentLabel(state.runtime.smoothedLux ?: state.runtime.rawLux)
+}
+
+private fun controlStatus(state: MainUiState): String {
+    return when {
+        state.runtime.isRunning -> "正在自动照顾屏幕亮度"
+        state.runtime.lastLux != null -> "已读取环境光，但未自动调节"
+        state.runtime.lightSensorTimedOut -> "未收到环境光，建议重试检测"
+        else -> "正在读取环境光"
     }
 }
 
@@ -798,6 +860,17 @@ private fun environmentLabel(lux: Float?): String {
         else -> "强光环境"
     }
 }
+
+private fun formatNullableBoolean(value: Boolean?): String =
+    value?.toString() ?: "检测中"
+
+private fun formatBrightnessMode(value: Int?): String =
+    when (value) {
+        android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC -> "自动($value)"
+        android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL -> "手动($value)"
+        null -> "未知"
+        else -> value.toString()
+    }
 
 private fun brightnessFeeling(percent: Float?): String {
     val value = percent ?: return "正在等待第一次亮度判断"

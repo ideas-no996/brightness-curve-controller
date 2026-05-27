@@ -7,12 +7,24 @@ import kotlinx.coroutines.flow.asStateFlow
 data class RuntimeSnapshot(
     val isRunning: Boolean = false,
     val isPausedForScreenOff: Boolean = false,
+    val hasLightSensor: Boolean? = null,
+    val lightSensorName: String? = null,
+    val lightSensorRegistered: Boolean = false,
+    val lightSensorTimedOut: Boolean = false,
     val rawLux: Float? = null,
     val smoothedLux: Float? = null,
+    val lastLux: Float? = null,
+    val lastLuxUpdateTime: Long? = null,
     val targetPercent: Float? = null,
     val writtenPercent: Float? = null,
+    val appliedBrightnessValue: Int? = null,
+    val canWriteSettings: Boolean? = null,
+    val brightnessMode: Int? = null,
+    val autoEnabled: Boolean = false,
+    val windowFallbackActive: Boolean = false,
     val activePresetName: String? = null,
     val message: String? = null,
+    val lastError: String? = null,
     val updatedAt: Long? = null
 )
 

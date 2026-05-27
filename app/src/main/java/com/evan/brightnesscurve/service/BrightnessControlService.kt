@@ -9,13 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -27,12 +25,16 @@ import com.evan.brightnesscurve.brightness.BrightnessMapping
 import com.evan.brightnesscurve.brightness.BrightnessRamp
 import com.evan.brightnesscurve.data.BrightnessPreset
 import com.evan.brightnesscurve.data.ResponseSpeed
+import com.evan.brightnesscurve.sensor.LightSensorSample
 import com.evan.brightnesscurve.sensor.LightSensorMonitor
+import com.evan.brightnesscurve.sensor.LightSensorStatus
 import com.evan.brightnesscurve.sensor.LuxSmoother
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -56,6 +58,8 @@ class BrightnessControlService : Service() {
     private var lastWrittenPercent: Float? = null
     private var lastWriteElapsed: Long = 0L
     private var isScreenOn: Boolean = true
+    private var luxTimeoutJob: Job? = null
+    private var sensorStartedAtMillis: Long = 0L
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -63,7 +67,7 @@ class BrightnessControlService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenOn = false
                     BrightnessRuntimeState.update {
-                        it.copy(isPausedForScreenOff = true, message = "屏幕关闭，暂停写入")
+                        it.copy(isPausedForScreenOff = true, autoEnabled = true, message = "屏幕关闭，暂停写入")
                     }
                 }
                 Intent.ACTION_SCREEN_ON -> {
@@ -71,8 +75,15 @@ class BrightnessControlService : Service() {
                     luxSmoother.reset()
                     lastWrittenPercent = brightnessController.readBrightnessPercent()
                     BrightnessRuntimeState.update {
-                        it.copy(isPausedForScreenOff = false, message = "屏幕点亮，恢复控制")
+                        it.copy(
+                            isPausedForScreenOff = false,
+                            autoEnabled = true,
+                            brightnessMode = readModeOrNull(),
+                            appliedBrightnessValue = brightnessController.readBrightness(),
+                            message = "屏幕点亮，恢复控制"
+                        )
                     }
+                    scheduleLuxTimeout()
                 }
             }
         }
@@ -85,10 +96,22 @@ class BrightnessControlService : Service() {
         val sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         lightSensorMonitor = LightSensorMonitor(
             sensorManager = sensorManager,
-            onLux = ::handleLuxSample,
-            onUnavailable = {
+            onSample = ::handleLuxSample,
+            onStatus = ::handleLightSensorStatus,
+            onUnavailable = { reason ->
                 BrightnessRuntimeState.update {
-                    it.copy(isRunning = false, message = "设备没有可用的光线传感器")
+                    it.copy(
+                        isRunning = false,
+                        autoEnabled = false,
+                        hasLightSensor = false,
+                        lightSensorRegistered = false,
+                        lightSensorTimedOut = false,
+                        canWriteSettings = brightnessController.canWrite(),
+                        brightnessMode = readModeOrNull(),
+                        message = reason,
+                        lastError = reason,
+                        updatedAt = System.currentTimeMillis()
+                    )
                 }
                 stopSelf()
             }
@@ -114,12 +137,21 @@ class BrightnessControlService : Service() {
         serviceScope.launch(Dispatchers.IO) {
             if (!brightnessController.canWrite()) {
                 BrightnessRuntimeState.update {
-                    it.copy(isRunning = false, message = "缺少修改系统设置权限")
+                    it.copy(
+                        isRunning = false,
+                        autoEnabled = false,
+                        canWriteSettings = false,
+                        brightnessMode = readModeOrNull(),
+                        message = "缺少修改系统设置权限",
+                        lastError = "缺少修改系统设置权限",
+                        updatedAt = System.currentTimeMillis()
+                    )
                 }
                 stopSelf()
                 return@launch
             }
 
+            app.presetRepository.ensureDefaults()
             captureOriginalSettings()
             app.preferencesRepository.setServiceEnabled(true)
             startSensor()
@@ -129,6 +161,7 @@ class BrightnessControlService : Service() {
     }
 
     override fun onDestroy() {
+        luxTimeoutJob?.cancel()
         lightSensorMonitor?.stop()
         unregisterReceiver(screenReceiver)
 
@@ -144,19 +177,140 @@ class BrightnessControlService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun handleLuxSample(rawLux: Float) {
-        val preset = currentPreset ?: return
-        if (!isScreenOn) return
+    private fun handleLightSensorStatus(status: LightSensorStatus) {
+        BrightnessRuntimeState.update {
+            it.copy(
+                hasLightSensor = status.hasLightSensor,
+                lightSensorName = status.sensorName,
+                lightSensorRegistered = status.isRegistered,
+                canWriteSettings = brightnessController.canWrite(),
+                brightnessMode = readModeOrNull(),
+                updatedAt = System.currentTimeMillis()
+            )
+        }
+    }
+
+    private fun handleLuxSample(sample: LightSensorSample) {
+        val rawLux = sample.lux
+        val preset = currentPreset
 
         val now = SystemClock.elapsedRealtime()
         val smoothedLux = luxSmoother.onSample(rawLux)
-        val maxAllowed = if (allowOutdoorFull) maxAllowedPercent else maxAllowedPercent.coerceAtMost(85f)
-        val mappedPercent = BrightnessMapping.targetPercent(
-            lux = smoothedLux,
-            points = preset.points,
-            minPercent = minAllowedPercent,
-            maxPercent = maxAllowed
+        val mode = readModeOrNull()
+        val canWrite = brightnessController.canWrite()
+
+        Log.d(
+            TAG,
+            "service lux=$rawLux, smoothed=$smoothedLux, sensor=${sample.sensorName}, preset=${preset?.name}, canWrite=$canWrite, mode=$mode"
         )
+
+        if (preset == null) {
+            BrightnessRuntimeState.update {
+                it.copy(
+                    isRunning = true,
+                    autoEnabled = true,
+                    rawLux = rawLux,
+                    smoothedLux = smoothedLux,
+                    lastLux = rawLux,
+                    lastLuxUpdateTime = sample.receivedAtMillis,
+                    targetPercent = null,
+                    activePresetName = null,
+                    hasLightSensor = true,
+                    lightSensorName = sample.sensorName,
+                    lightSensorRegistered = true,
+                    lightSensorTimedOut = false,
+                    canWriteSettings = canWrite,
+                    brightnessMode = mode,
+                    message = "已读取环境光，等待亮度曲线加载",
+                    lastError = null,
+                    updatedAt = System.currentTimeMillis()
+                )
+            }
+            return
+        }
+
+        if (!isScreenOn) {
+            BrightnessRuntimeState.update {
+                it.copy(
+                    isRunning = true,
+                    autoEnabled = true,
+                    rawLux = rawLux,
+                    smoothedLux = smoothedLux,
+                    lastLux = rawLux,
+                    lastLuxUpdateTime = sample.receivedAtMillis,
+                    hasLightSensor = true,
+                    lightSensorName = sample.sensorName,
+                    lightSensorRegistered = true,
+                    lightSensorTimedOut = false,
+                    canWriteSettings = canWrite,
+                    brightnessMode = mode,
+                    message = "已读取环境光，屏幕关闭时暂停写入",
+                    lastError = null,
+                    updatedAt = System.currentTimeMillis()
+                )
+            }
+            return
+        }
+
+        val maxAllowed = if (allowOutdoorFull) maxAllowedPercent else maxAllowedPercent.coerceAtMost(85f)
+        val mappedPercent = runCatching {
+            BrightnessMapping.targetPercent(
+                lux = smoothedLux,
+                points = preset.points,
+                minPercent = minAllowedPercent,
+                maxPercent = maxAllowed
+            )
+        }.getOrElse { throwable ->
+            val error = throwable.message ?: "亮度曲线计算失败"
+            Log.e(TAG, "target mapping failed", throwable)
+            BrightnessRuntimeState.update {
+                it.copy(
+                    isRunning = true,
+                    autoEnabled = true,
+                    rawLux = rawLux,
+                    smoothedLux = smoothedLux,
+                    lastLux = rawLux,
+                    lastLuxUpdateTime = sample.receivedAtMillis,
+                    hasLightSensor = true,
+                    lightSensorName = sample.sensorName,
+                    lightSensorRegistered = true,
+                    lightSensorTimedOut = false,
+                    canWriteSettings = canWrite,
+                    brightnessMode = mode,
+                    activePresetName = preset.name,
+                    message = error,
+                    lastError = error,
+                    updatedAt = System.currentTimeMillis()
+                )
+            }
+            return
+        }
+
+        if (mappedPercent.isNaN() || mappedPercent.isInfinite()) {
+            val error = "亮度曲线结果无效"
+            BrightnessRuntimeState.update {
+                it.copy(
+                    isRunning = true,
+                    autoEnabled = true,
+                    rawLux = rawLux,
+                    smoothedLux = smoothedLux,
+                    lastLux = rawLux,
+                    lastLuxUpdateTime = sample.receivedAtMillis,
+                    hasLightSensor = true,
+                    lightSensorName = sample.sensorName,
+                    lightSensorRegistered = true,
+                    lightSensorTimedOut = false,
+                    canWriteSettings = canWrite,
+                    brightnessMode = mode,
+                    activePresetName = preset.name,
+                    message = error,
+                    lastError = error,
+                    updatedAt = System.currentTimeMillis()
+                )
+            }
+            return
+        }
+
         val (targetPercent, rampShouldWrite) = brightnessRamp.next(lastWrittenPercent, mappedPercent)
         val canWriteByTime = now - lastWriteElapsed >= MIN_WRITE_INTERVAL_MS
         val shouldWrite = rampShouldWrite && canWriteByTime
@@ -164,15 +318,26 @@ class BrightnessControlService : Service() {
         BrightnessRuntimeState.update {
             it.copy(
                 isRunning = true,
+                autoEnabled = true,
                 rawLux = rawLux,
                 smoothedLux = smoothedLux,
+                lastLux = rawLux,
+                lastLuxUpdateTime = sample.receivedAtMillis,
                 targetPercent = targetPercent,
                 activePresetName = preset.name,
+                hasLightSensor = true,
+                lightSensorName = sample.sensorName,
+                lightSensorRegistered = true,
+                lightSensorTimedOut = false,
+                canWriteSettings = canWrite,
+                brightnessMode = mode,
                 message = when {
+                    !canWrite -> "已读取环境光，但缺少写入亮度权限"
                     shouldWrite -> "正在柔和调整亮度"
                     !canWriteByTime -> "已感知光线变化，等待节流窗口"
                     else -> "变化较小，保持当前亮度"
                 },
+                lastError = if (canWrite) null else "缺少修改系统设置权限",
                 updatedAt = System.currentTimeMillis()
             )
         }
@@ -181,13 +346,29 @@ class BrightnessControlService : Service() {
 
         serviceScope.launch(Dispatchers.IO) {
             writeMutex.withLock {
-                if (!brightnessController.canWrite()) return@withLock
-                brightnessController.writeManualBrightness(targetPercent)
+                if (!brightnessController.canWrite()) {
+                    BrightnessRuntimeState.update {
+                        it.copy(
+                            canWriteSettings = false,
+                            brightnessMode = readModeOrNull(),
+                            message = "写入前权限失效，已暂停亮度写入",
+                            lastError = "写入前权限失效",
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
+                    return@withLock
+                }
+                val appliedValue = brightnessController.writeManualBrightness(targetPercent)
+                Log.d(TAG, "write brightness targetPercent=$targetPercent, systemValue=$appliedValue")
                 lastWrittenPercent = targetPercent
                 lastWriteElapsed = SystemClock.elapsedRealtime()
                 BrightnessRuntimeState.update {
                     it.copy(
                         writtenPercent = targetPercent,
+                        appliedBrightnessValue = appliedValue,
+                        canWriteSettings = true,
+                        brightnessMode = readModeOrNull(),
+                        lastError = null,
                         updatedAt = System.currentTimeMillis()
                     )
                 }
@@ -203,7 +384,23 @@ class BrightnessControlService : Service() {
                     luxSmoother.reset()
                     lastWrittenPercent = brightnessController.readBrightnessPercent()
                     BrightnessRuntimeState.update {
-                        it.copy(activePresetName = preset.name, message = "已加载预设：${preset.name}")
+                        it.copy(
+                            activePresetName = preset.name,
+                            appliedBrightnessValue = brightnessController.readBrightness(),
+                            brightnessMode = readModeOrNull(),
+                            canWriteSettings = brightnessController.canWrite(),
+                            message = "已加载预设：${preset.name}",
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
+                } else {
+                    BrightnessRuntimeState.update {
+                        it.copy(
+                            activePresetName = null,
+                            message = "没有启用的亮度曲线",
+                            lastError = "没有启用的亮度曲线",
+                            updatedAt = System.currentTimeMillis()
+                        )
                     }
                 }
             }
@@ -220,6 +417,9 @@ class BrightnessControlService : Service() {
                     brightenStepPercent = responseSpeed.brightenStep,
                     darkenStepPercent = responseSpeed.darkenStep
                 )
+                BrightnessRuntimeState.update {
+                    it.copy(autoEnabled = settings.serviceEnabled || it.isRunning)
+                }
             }
         }
     }
@@ -248,11 +448,45 @@ class BrightnessControlService : Service() {
             }
         }
         lastWrittenPercent = brightnessController.readBrightnessPercent()
-        lightSensorMonitor?.start()
+        val started = lightSensorMonitor?.start() == true
+        sensorStartedAtMillis = System.currentTimeMillis()
+        if (started) scheduleLuxTimeout()
         BrightnessRuntimeState.update {
-            it.copy(isRunning = true, message = "亮度控制已启动")
+            it.copy(
+                isRunning = started,
+                autoEnabled = started,
+                lightSensorTimedOut = false,
+                canWriteSettings = brightnessController.canWrite(),
+                brightnessMode = readModeOrNull(),
+                appliedBrightnessValue = brightnessController.readBrightness(),
+                message = if (started) "亮度控制已启动，正在读取环境光" else "光线传感器启动失败",
+                lastError = if (started) null else "光线传感器启动失败",
+                updatedAt = System.currentTimeMillis()
+            )
         }
     }
+
+    private fun scheduleLuxTimeout() {
+        luxTimeoutJob?.cancel()
+        luxTimeoutJob = serviceScope.launch {
+            val startedAt = sensorStartedAtMillis
+            delay(LUX_TIMEOUT_MS)
+            val state = BrightnessRuntimeState.state.value
+            if (state.isRunning && (state.lastLuxUpdateTime == null || state.lastLuxUpdateTime < startedAt)) {
+                BrightnessRuntimeState.update {
+                    it.copy(
+                        lightSensorTimedOut = true,
+                        message = "未收到环境光数据",
+                        lastError = "5 秒内未收到环境光数据",
+                        updatedAt = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun readModeOrNull(): Int? =
+        runCatching { brightnessController.readMode() }.getOrNull()
 
     private fun registerScreenReceiver() {
         val filter = IntentFilter().apply {
@@ -304,8 +538,10 @@ class BrightnessControlService : Service() {
             .build()
 
     companion object {
+        private const val TAG = "BrightnessControlService"
         private const val CHANNEL_ID = "brightness_curve_controller"
         private const val NOTIFICATION_ID = 20
         private const val MIN_WRITE_INTERVAL_MS = 220L
+        private const val LUX_TIMEOUT_MS = 5_000L
     }
 }

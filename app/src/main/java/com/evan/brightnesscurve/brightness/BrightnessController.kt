@@ -26,7 +26,8 @@ class BrightnessController(private val context: Context) {
         readBrightness().coerceIn(MIN_SYSTEM_BRIGHTNESS, MAX_SYSTEM_BRIGHTNESS) /
             MAX_SYSTEM_BRIGHTNESS.toFloat() * 100f
 
-    fun writeManualBrightness(percent: Float) {
+    fun writeManualBrightness(percent: Float): Int {
+        val systemValue = percentToSystemValue(percent)
         Settings.System.putInt(
             resolver,
             Settings.System.SCREEN_BRIGHTNESS_MODE,
@@ -35,8 +36,9 @@ class BrightnessController(private val context: Context) {
         Settings.System.putInt(
             resolver,
             Settings.System.SCREEN_BRIGHTNESS,
-            percentToSystemValue(percent)
+            systemValue
         )
+        return systemValue
     }
 
     fun restore(mode: Int, brightness: Int) {
