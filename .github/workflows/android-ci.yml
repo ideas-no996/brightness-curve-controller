@@ -101,6 +101,17 @@ jobs:
             echo "Release ${GITHUB_REF_NAME}" > release-notes.md
           fi
 
+      - name: Validate release trust notes
+        run: |
+          missing=0
+          for pattern in "Compatibility note:" "Core brightness loop physical-device test:" "Install integrity:"; do
+            if ! grep -Fq "$pattern" release-notes.md; then
+              echo "::error::release notes must include '$pattern'"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

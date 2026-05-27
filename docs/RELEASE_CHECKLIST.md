@@ -9,6 +9,7 @@ Use this checklist before publishing a new APK. The goal is to avoid shipping re
 - `./gradlew testDebugUnitTest assembleDebug` passes.
 - `CHANGELOG.md` contains the target `## vX.Y.Z` section.
 - Release notes clearly state whether brightness control logic changed.
+- Release notes include `Compatibility note:`, `Core brightness loop physical-device test:`, and `Install integrity:`. The release workflow enforces these strings.
 
 ## Required Trust Checks
 

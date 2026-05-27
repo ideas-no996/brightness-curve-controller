@@ -9,7 +9,7 @@ However, the project should be described by its evidence, not by the historical 
 - Existing `v1.0.x` tags remain as historical releases.
 - Future releases must say whether a physical-device core loop test was performed.
 - Release notes must not imply broad Android support unless the compatibility matrix proves it.
-- If future work remains primarily experimental, prefer `v0.2.x` or explicitly label `v1.0.x` releases as experimental.
+- Because existing public releases and the in-app updater already compare against `v1.0.x`, future releases should not jump backward to `v0.x`. Instead, keep future `v1.0.x` releases explicitly labeled as experimental until the compatibility matrix proves stable support.
 - A stable `1.x` claim requires multiple device families to reach `Core Loop Verified` or better in `docs/COMPATIBILITY.md`.
 
 ## Stable Release Bar

@@ -138,14 +138,14 @@ Automatic control completes lux -> target -> write -> read-back -> UI status.
 
 Core loop verified across restarts, screen off/on, permission refresh, and at least 24 hours of normal use.
 
-## Documentation Changes Needed
+## Documentation Status
 
-Update:
+Updated:
 
-- `README.md`: replace broad Android 8.0+ language with limited experimental wording.
-- `docs/COMPATIBILITY.md`: add support claim levels and require core-loop verification.
-- `docs/FAQ.md`: add vendor-specific failure explanation.
-- Release notes: mention tested devices for each release.
+- `README.md`: broad Android 8.0+ language has been replaced with limited experimental wording.
+- `docs/COMPATIBILITY.md`: support claim levels and core-loop verification requirements are documented.
+- `docs/FAQ.md`: vendor-specific brightness and sensor failure notes are documented.
+- Release notes: future releases are required to mention whether a physical-device core-loop test was performed.
 
 ## Minimum Data For A Compatibility Report
 

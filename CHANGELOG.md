@@ -14,6 +14,18 @@
 - Added in-app SHA-256 verification for downloaded release APKs before installer handoff.
 - Added target system brightness and no-write reason to runtime diagnostics and copied diagnostic reports.
 
+Compatibility note:
+This remains an experimental Android brightness utility. Android 8.0+ is the technical minSdk, not a broad device support guarantee.
+
+Verification:
+- Unit tests: passed
+- Debug build: passed
+- Core brightness loop physical-device test: not performed for this documentation/diagnostics optimization because no adb device was attached.
+- Tested device: not tested in this pass.
+
+Install integrity:
+Verify the APK SHA-256 with SHA256SUMS.txt. The release APK should be signed with certificate SHA-256 d89f04a7fccd53db21ad3fba7167f0704af52c1792d53799d636259e6a104bd6.
+
 ## v1.0.5
 
 This release fixes the tutorial overlay so the "do not show again" choice is respected after restarting the app.

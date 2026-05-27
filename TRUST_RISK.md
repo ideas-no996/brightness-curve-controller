@@ -9,10 +9,10 @@ This document lists the issues most likely to make users distrust the app before
 | Risk | Severity | Current Evidence | Required Fix |
 | --- | --- | --- | --- |
 | Empty GitHub About metadata | Medium | `gh repo view` reports empty description, empty homepage, no topics | Add description and topics |
-| Broad compatibility impression | High | README says theoretically Android 8.0+; only OPPO/ColorOS tablet is listed as tested | Rewrite support claims as limited and experimental |
+| Broad compatibility impression | High | Original README implied Android 8.0+; only OPPO/ColorOS tablet is listed as tested | Support claims rewritten as limited and experimental |
 | Suspicious update permissions | High | Manifest includes `INTERNET` and `REQUEST_INSTALL_PACKAGES` | Explain in UI and docs; verify checksums; publish signing fingerprint |
 | Core loop not independently proven | High | Code has diagnostics, but no device-level verification script/report | Add core verification guide, script, and release gate |
-| Fast `v1.0.x` release sequence | Medium | 6 releases across 18 commits, including recent core regression fixes | Mark project experimental or move future releases to `0.x` |
+| Fast `v1.0.x` release sequence | Medium | 6 releases across 18 commits, including recent core regression fixes | Keep history, label future `v1.0.x` releases experimental until compatibility evidence improves |
 | No diagnostic export | High | Diagnostics panel exists, issue template asks for screenshots/paste | Add one-tap copy/export report |
 | Window brightness fallback ambiguity | Medium | App can modify current window brightness when system write permission is missing | Label as preview-only or remove |
 | Release integrity not easy for users | Medium | `SHA256SUMS.txt` exists, but no plain verification workflow or signature fingerprint | Add verification instructions and certificate fingerprint |
@@ -119,10 +119,11 @@ Recommended fix:
 
 This is normal for early software, but it is not normal for a trusted `1.0` utility that modifies a global system setting.
 
-Recommended policy:
+Current policy:
 
-- Either continue `v1.0.x` but state "experimental, limited device validation" everywhere.
-- Or switch future development to `v0.2.x` until the core loop passes multiple device families.
+- Keep existing `v1.0.x` history.
+- Do not jump future updates backward to `v0.x`, because the in-app updater already compares against `v1.0.x`.
+- State "experimental, limited device validation" in future `v1.0.x` release notes until the core loop passes multiple device families.
 
 Do not hide this. Conservative versioning increases trust.
 

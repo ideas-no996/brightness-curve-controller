@@ -85,7 +85,7 @@ Trust impact: medium. Empty metadata makes the project look unfinished even when
 
 ### 3. Compatibility Language Is Too Broad For The Evidence
 
-`README.md` says "theoretically Android 8.0+" and `docs/COMPATIBILITY.md` says the app targets Android 8.0+. The real tested matrix currently lists only an OPPO/ColorOS tablet with unknown Android version.
+Original finding: `README.md` said "theoretically Android 8.0+" and `docs/COMPATIBILITY.md` said the app targets Android 8.0+. The real tested matrix listed only an OPPO/ColorOS tablet with unknown Android version.
 
 This is too optimistic for an app that depends on:
 
@@ -96,7 +96,7 @@ This is too optimistic for an app that depends on:
 - battery/background restrictions
 - system auto-brightness behavior
 
-Recommended tone: "tested on a limited ColorOS tablet environment; Android 8.0+ is the technical minSdk, not a support guarantee."
+Current mitigation: README and compatibility docs now say "Android 8.0+ is the technical minSdk, not a support guarantee" and describe the app as experimental with limited device validation.
 
 Trust impact: high. Overstating compatibility creates bad first-run experiences and low-quality bug reports.
 
@@ -115,14 +115,11 @@ Trust impact: high. Even if the implementation is benign, the permission set can
 
 ### 5. Version Number Looks More Mature Than The Evidence
 
-The project has 18 commits and six releases from `v1.0.0` to `v1.0.5`. The code has recently fixed critical regressions in system brightness control and tutorial persistence.
+Original finding: the project had 18 commits and six releases from `v1.0.0` to `v1.0.5`, including recent fixes for critical brightness control and tutorial persistence.
 
 Problem: `v1.0.x` suggests a stable public contract. The project evidence says "early experimental Android utility with limited device coverage."
 
-Recommended options:
-
-- Prefer future versions such as `v0.2.x` until multiple device families pass the core loop.
-- If keeping `v1.0.x`, explicitly mark releases and README as "experimental" and "limited device validation."
+Current mitigation: existing `v1.0.x` tags are kept as history, future `v1.0.x` releases are explicitly experimental until the compatibility matrix proves stable support, and release notes must disclose whether a physical-device core-loop test was performed.
 
 Trust impact: medium to high. Fast `1.0.x` iteration after core regressions reads as version inflation.
 

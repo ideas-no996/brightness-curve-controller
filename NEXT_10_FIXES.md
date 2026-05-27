@@ -125,11 +125,11 @@ Acceptance:
 
 Type: project governance
 
-Status: documented in `docs/VERSIONING.md`; future release numbering still needs an explicit decision before the next APK.
+Status: decided in `docs/VERSIONING.md`: do not rewrite existing `v1.0.x` history; keep future `v1.0.x` releases explicitly experimental unless the compatibility matrix proves stable support.
 
 Action:
 
-- Decide whether future releases stay `v1.0.x` with explicit "experimental" labeling or move to `v0.2.x`.
+- Keep future `v1.0.x` releases explicitly experimental unless the compatibility matrix proves stable support.
 - Document the policy in README and release docs.
 
 Acceptance:
@@ -140,7 +140,7 @@ Acceptance:
 
 Type: CI/release process
 
-Status: documented in `docs/RELEASE_CHECKLIST.md`; not yet enforced by CI.
+Status: documented in `docs/RELEASE_CHECKLIST.md` and enforced in the release workflow by required release-note trust sections.
 
 Action:
 
