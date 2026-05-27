@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Trust And Verification
+
+- Added strict trust, compatibility, and core-loop audit documents.
+- Rewrote project documentation to describe the app as an experimental, limited-device Android brightness utility.
+- Added GitHub issue guidance for core-loop verification evidence.
+- Added a PowerShell adb collection script for core brightness verification bundles.
+- Added a copyable in-app diagnostic report covering device, permission, sensor, target brightness, write, read-back, and error state.
+- Added release checklist, signing certificate fingerprint, checksum verification guidance, and versioning policy.
+
 ## v1.0.5
 
 This release fixes the tutorial overlay so the "do not show again" choice is respected after restarting the app.

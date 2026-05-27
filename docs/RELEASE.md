@@ -124,7 +124,18 @@ sha256sum BrightnessCurveController-<version>.apk
 
 把输出值和 `SHA256SUMS.txt` 中的值对比。值一致只能证明下载完整性，不等于证明设备兼容性。
 
-## 7. 如果发布失败
+当前 release APK 签名证书指纹见 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)。如果以后指纹意外变化，应暂停发布并检查签名配置。
+
+## 7. 发布检查清单
+
+每次发布前按 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) 检查，尤其是：
+
+- 是否说明本版本有没有改动亮度控制链路
+- 是否说明有没有做真机核心闭环验收
+- APK 是否有 `SHA256SUMS.txt`
+- APK 签名证书指纹是否符合预期
+
+## 8. 如果发布失败
 
 先检查：
 

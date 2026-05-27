@@ -76,6 +76,8 @@ Acceptance:
 
 Type: tooling
 
+Status: implemented as `scripts/collect-core-verification.ps1`; still needs real device output feedback.
+
 Action:
 
 - Add `scripts/collect-core-verification.ps1`.
@@ -104,6 +106,8 @@ Acceptance:
 
 Type: release/security
 
+Status: partially implemented with checksum instructions, release checklist, and current signing certificate fingerprint.
+
 Action:
 
 - Add checksum verification commands to README and release docs.
@@ -119,6 +123,8 @@ Acceptance:
 
 Type: project governance
 
+Status: documented in `docs/VERSIONING.md`; future release numbering still needs an explicit decision before the next APK.
+
 Action:
 
 - Decide whether future releases stay `v1.0.x` with explicit "experimental" labeling or move to `v0.2.x`.
@@ -131,6 +137,8 @@ Acceptance:
 ## 9. Add Release Gate For Physical Device Verification
 
 Type: CI/release process
+
+Status: documented in `docs/RELEASE_CHECKLIST.md`; not yet enforced by CI.
 
 Action:
 

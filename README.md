@@ -191,6 +191,14 @@ sha256sum BrightnessCurveController-<version>.apk
 
 将输出值与 Release 中的 `SHA256SUMS.txt` 对比后再安装。
 
+当前 release APK 签名证书 SHA-256 指纹：
+
+```text
+d89f04a7fccd53db21ad3fba7167f0704af52c1792d53799d636259e6a104bd6
+```
+
+更完整的发布检查清单见 [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)。
+
 不要提交 keystore、密码、alias 或本地 signing 配置文件。
 
 更详细的一步一步说明见 [docs/RELEASE.md](docs/RELEASE.md)。
@@ -230,7 +238,7 @@ app/src/main/java/com/evan/brightnesscurve/
 
 ## 成熟度和路线图
 
-当前 `v1.0.x` 是已经发布的历史版本号，但项目成熟度仍按实验性工具处理。后续版本是否继续使用 `v1.0.x`，还是转为 `v0.2.x` 直到多设备验证完成，会在后续 release policy 中明确。
+当前 `v1.0.x` 是已经发布的历史版本号，但项目成熟度仍按实验性工具处理。版本策略见 [docs/VERSIONING.md](docs/VERSIONING.md)。
 
 优先路线：
 
