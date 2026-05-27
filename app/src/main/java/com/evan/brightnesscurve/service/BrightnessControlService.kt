@@ -118,6 +118,12 @@ class BrightnessControlService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ServiceActions.ACTION_STOP) {
+            runBlocking(Dispatchers.IO) {
+                app.preferencesRepository.setAutoControlEnabled(false)
+                BrightnessRuntimeState.dispatch(
+                    RuntimeEvent.AutoEnabledChanged(desiredAutoControlEnabled = false)
+                )
+            }
             stopSelf()
             return START_NOT_STICKY
         }
@@ -135,7 +141,6 @@ class BrightnessControlService : Service() {
 
             app.presetRepository.ensureDefaults()
             captureOriginalSettings()
-            app.preferencesRepository.setServiceEnabled(true)
             startSensor()
         }
 
@@ -149,7 +154,6 @@ class BrightnessControlService : Service() {
 
         runBlocking(Dispatchers.IO) {
             restoreOriginalSettings()
-            app.preferencesRepository.setServiceEnabled(false)
         }
 
         serviceScope.cancel()
@@ -365,7 +369,7 @@ class BrightnessControlService : Service() {
                 )
                 BrightnessRuntimeState.dispatch(
                     RuntimeEvent.AutoEnabledChanged(
-                        desiredServiceEnabled = settings.serviceEnabled
+                        desiredAutoControlEnabled = settings.autoControlEnabled
                     )
                 )
             }

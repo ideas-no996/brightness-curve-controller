@@ -16,7 +16,7 @@ private val Context.brightnessDataStore by preferencesDataStore("brightness_cont
 
 data class AppSettings(
     val activePresetId: Long?,
-    val serviceEnabled: Boolean,
+    val autoControlEnabled: Boolean,
     val startOnBoot: Boolean,
     val allowOutdoorFull: Boolean,
     val lastComfortPercent: Float,
@@ -51,7 +51,7 @@ class AppPreferencesRepository(private val context: Context) {
     val settings: Flow<AppSettings> = context.brightnessDataStore.data.map { prefs ->
         AppSettings(
             activePresetId = prefs[Keys.ActivePresetId],
-            serviceEnabled = prefs[Keys.ServiceEnabled] ?: false,
+            autoControlEnabled = prefs[Keys.ServiceEnabled] ?: false,
             startOnBoot = prefs[Keys.StartOnBoot] ?: false,
             allowOutdoorFull = prefs[Keys.AllowOutdoorFull] ?: true,
             lastComfortPercent = prefs[Keys.LastComfortPercent] ?: 20f,
@@ -69,7 +69,7 @@ class AppPreferencesRepository(private val context: Context) {
         context.brightnessDataStore.edit { it[Keys.ActivePresetId] = id }
     }
 
-    suspend fun setServiceEnabled(enabled: Boolean) {
+    suspend fun setAutoControlEnabled(enabled: Boolean) {
         context.brightnessDataStore.edit { it[Keys.ServiceEnabled] = enabled }
     }
 

@@ -99,7 +99,7 @@ data class RuntimeSnapshot(
     val appliedBrightnessValue: Int? = null,
     val canWriteSettings: Boolean? = null,
     val brightnessMode: Int? = null,
-    val autoEnabled: Boolean = false,
+    val autoControlDesired: Boolean = false,
     val windowFallbackActive: Boolean = false,
     val activePresetName: String? = null,
     val message: String? = null,
@@ -208,7 +208,7 @@ sealed interface RuntimeEvent {
     data object NoActivePresetConfigured : RuntimeEvent
 
     data class AutoEnabledChanged(
-        val desiredServiceEnabled: Boolean
+        val desiredAutoControlEnabled: Boolean
     ) : RuntimeEvent
 
     data class ServiceStartAnnounced(
@@ -225,7 +225,7 @@ sealed interface RuntimeEvent {
 
 fun RuntimeSnapshot.resolvedRuntimeStatus(): RuntimeStatus {
     return when {
-        canWriteSettings == false && (autoEnabled || isRunning) -> RuntimeStatus.PermissionMissing
+        canWriteSettings == false && (autoControlDesired || isRunning) -> RuntimeStatus.PermissionMissing
         hasLightSensor == false -> RuntimeStatus.NoSensor
         lightSensorTimedOut -> RuntimeStatus.SensorTimeout
         isWriteFailure() -> RuntimeStatus.WriteFailed
@@ -288,7 +288,6 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             }
             current.copy(
                 isRunning = false,
-                autoEnabled = false,
                 rawLux = event.rawLux,
                 smoothedLux = event.smoothedLux,
                 lastLux = event.rawLux,
@@ -318,13 +317,11 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         RuntimeEvent.ScreenTurnedOff -> current.copy(
             isPausedForScreenOff = true,
-            autoEnabled = true,
             message = "屏幕关闭，暂停写入"
         )
 
         is RuntimeEvent.ScreenTurnedOn -> current.copy(
             isPausedForScreenOff = false,
-            autoEnabled = true,
             brightnessMode = event.brightnessMode,
             appliedBrightnessValue = event.appliedBrightnessValue,
             message = "屏幕点亮，恢复控制"
@@ -332,7 +329,6 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         is RuntimeEvent.ServiceSensorUnavailable -> current.copy(
             isRunning = false,
-            autoEnabled = false,
             hasLightSensor = false,
             lightSensorRegistered = false,
             lightSensorTimedOut = false,
@@ -344,7 +340,6 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         is RuntimeEvent.ServicePermissionMissing -> current.copy(
             isRunning = false,
-            autoEnabled = false,
             canWriteSettings = false,
             brightnessMode = event.brightnessMode,
             message = "缺少修改系统设置权限",
@@ -355,7 +350,6 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
             isRunning = false,
             isPausedForScreenOff = false,
             lightSensorRegistered = false,
-            autoEnabled = false,
             windowFallbackActive = false,
             message = event.message
         )
@@ -370,7 +364,6 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         is RuntimeEvent.ServiceLuxObserved -> current.copy(
             isRunning = true,
-            autoEnabled = true,
             isPausedForScreenOff = event.isPausedForScreenOff,
             rawLux = event.rawLux,
             smoothedLux = event.smoothedLux,
@@ -422,7 +415,7 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
         )
 
         is RuntimeEvent.AutoEnabledChanged -> current.copy(
-            autoEnabled = event.desiredServiceEnabled || current.isRunning
+            autoControlDesired = event.desiredAutoControlEnabled
         )
 
         is RuntimeEvent.ServiceStartAnnounced -> current.copy(
@@ -431,7 +424,6 @@ internal fun reduceRuntimeSnapshot(current: RuntimeSnapshot, event: RuntimeEvent
 
         is RuntimeEvent.ServiceStartCompleted -> current.copy(
             isRunning = event.started,
-            autoEnabled = event.started,
             lightSensorTimedOut = false,
             canWriteSettings = event.canWriteSettings,
             brightnessMode = event.brightnessMode,

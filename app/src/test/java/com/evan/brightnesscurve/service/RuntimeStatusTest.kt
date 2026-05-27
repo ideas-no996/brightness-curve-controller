@@ -7,7 +7,7 @@ class RuntimeStatusTest {
     @Test
     fun `permission missing beats waiting sensor state when auto is requested`() {
         val snapshot = RuntimeSnapshot(
-            autoEnabled = true,
+            autoControlDesired = true,
             lightSensorRegistered = true,
             canWriteSettings = false
         )
@@ -64,7 +64,7 @@ class RuntimeStatusTest {
         val snapshot = reduceRuntimeSnapshot(
             RuntimeSnapshot(
                 isRunning = true,
-                autoEnabled = true,
+                autoControlDesired = true,
                 lightSensorRegistered = true,
                 lastError = "5 秒内未收到环境光数据"
             ),
@@ -72,7 +72,7 @@ class RuntimeStatusTest {
         )
 
         assertEquals(false, snapshot.isRunning)
-        assertEquals(false, snapshot.autoEnabled)
+        assertEquals(true, snapshot.autoControlDesired)
         assertEquals("5 秒内未收到环境光数据", snapshot.lastError)
         assertEquals("服务已停止，已尝试恢复原亮度设置", snapshot.message)
     }

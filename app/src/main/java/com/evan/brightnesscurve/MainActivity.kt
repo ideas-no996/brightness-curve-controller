@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onToggleService = { enabled ->
                         if (enabled && !BrightnessSettings.canWrite(context)) {
+                            viewModel.setAutoControlEnabled(true)
                             viewModel.enableWindowBrightnessFallback()
                             viewModel.refreshWritePermission()
                             val intent = Intent(
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
                             )
                             writeSettingsLauncher.launch(intent)
                         } else {
-                            viewModel.setServiceEnabled(enabled)
+                            viewModel.setAutoControlEnabled(enabled)
                         }
                     },
                     onToggleStartOnBoot = viewModel::setStartOnBoot,

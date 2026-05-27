@@ -243,7 +243,7 @@ private fun HomeTab(
                             Text(controlStatus(state))
                         }
                         Switch(
-                            checked = state.settings.serviceEnabled,
+                            checked = state.settings.autoControlEnabled,
                             onCheckedChange = onToggleService,
                             enabled = true
                         )
@@ -709,7 +709,8 @@ private fun DiagnosticsPanel(state: MainUiState, onRetryLightSensor: () -> Unit)
             MetricRow("sensorName", state.runtime.lightSensorName ?: "-")
             MetricRow("lastLux", state.runtime.lastLux?.let { "%.1f lux".format(it) } ?: "-")
             MetricRow("lastLuxUpdateTime", state.runtime.lastLuxUpdateTime?.let(::formatTime) ?: "-")
-            MetricRow("autoEnabled", (state.settings.serviceEnabled || state.runtime.autoEnabled).toString())
+            MetricRow("autoDesired", state.settings.autoControlEnabled.toString())
+            MetricRow("serviceRunning", state.runtime.isRunning.toString())
             MetricRow("targetBrightnessPercent", state.runtime.targetPercent?.let { "%.0f%%".format(it) } ?: "-")
             MetricRow("appliedBrightnessValue", state.runtime.appliedBrightnessValue?.toString() ?: "-")
             MetricRow("canWriteSettings", state.canWriteSettings.toString())
@@ -829,7 +830,8 @@ private fun DebugInfoPanel(state: MainUiState) {
                 MetricRow("raw lux", state.runtime.rawLux?.let { "%.1f".format(it) } ?: "-")
                 MetricRow("smoothed lux", state.runtime.smoothedLux?.let { "%.1f".format(it) } ?: "-")
                 MetricRow("lastLuxUpdateTime", state.runtime.lastLuxUpdateTime?.let(::formatTime) ?: "-")
-                MetricRow("autoEnabled", (state.settings.serviceEnabled || state.runtime.autoEnabled).toString())
+                MetricRow("autoDesired", state.settings.autoControlEnabled.toString())
+                MetricRow("serviceRunning", state.runtime.isRunning.toString())
                 MetricRow("target", state.runtime.targetPercent?.let { "%.0f%%".format(it) } ?: "-")
                 MetricRow("written", state.runtime.writtenPercent?.let { "%.0f%%".format(it) } ?: "-")
                 MetricRow("applied", state.runtime.appliedBrightnessValue?.toString() ?: "-")

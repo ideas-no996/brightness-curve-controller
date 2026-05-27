@@ -18,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
         val app = context.applicationContext as BrightnessCurveApp
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             val settings = app.preferencesRepository.currentSettings()
-            if (settings.startOnBoot && settings.serviceEnabled && BrightnessSettings.canWrite(context)) {
+            if (settings.startOnBoot && settings.autoControlEnabled && BrightnessSettings.canWrite(context)) {
                 ServiceController.start(context)
             }
             pendingResult.finish()

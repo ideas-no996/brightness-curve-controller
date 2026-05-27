@@ -49,7 +49,7 @@ data class MainUiState(
     val runtime: RuntimeSnapshot = RuntimeSnapshot(),
     val settings: AppSettings = AppSettings(
         activePresetId = null,
-        serviceEnabled = false,
+        autoControlEnabled = false,
         startOnBoot = false,
         allowOutdoorFull = true,
         lastComfortPercent = 20f,
@@ -160,12 +160,15 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
                 brightnessMode = readModeOrNull()
             )
         )
+        if (canWrite && uiState.value.settings.autoControlEnabled && !BrightnessRuntimeState.state.value.isRunning) {
+            ServiceController.start(app)
+        }
     }
 
     fun retryLightSensorDetection() {
         startPassiveLightSensor()
         val state = uiState.value
-        if ((state.settings.serviceEnabled || state.runtime.isRunning) && BrightnessSettings.canWrite(app)) {
+        if ((state.settings.autoControlEnabled || state.runtime.isRunning) && BrightnessSettings.canWrite(app)) {
             ServiceController.start(app)
         }
     }
@@ -306,11 +309,20 @@ class MainViewModel(private val app: BrightnessCurveApp) : AndroidViewModel(app)
         }.isSuccess
     }
 
-    fun setServiceEnabled(enabled: Boolean) {
+    fun setAutoControlEnabled(enabled: Boolean) {
         viewModelScope.launch {
+            app.preferencesRepository.setAutoControlEnabled(enabled)
+            BrightnessRuntimeState.dispatch(
+                RuntimeEvent.AutoEnabledChanged(desiredAutoControlEnabled = enabled)
+            )
             if (enabled) {
                 if (!BrightnessSettings.canWrite(app)) {
                     canWriteSettings.value = false
+                    BrightnessRuntimeState.dispatch(
+                        RuntimeEvent.ServicePermissionMissing(
+                            brightnessMode = readModeOrNull()
+                        )
+                    )
                     message.value = "请先授予修改系统设置权限"
                     return@launch
                 }
