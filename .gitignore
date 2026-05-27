@@ -9,3 +9,4 @@ local.properties
 release-keystore.jks
 release-signing.properties
 release-signing/
+diagnostics/

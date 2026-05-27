@@ -37,6 +37,7 @@ Windows 也可以使用：
 - 单元测试通过。
 - 没有提交 `local.properties`、APK、IDE 缓存或个人路径。
 - 如果修改亮度控制逻辑，请说明真机测试设备、系统版本和观察结果。
+- 如果修改核心亮度链路，请按 `CORE_FUNCTION_VERIFICATION.md` 记录 lux -> 写入 -> 回读 -> UI 状态，并尽量附上 `scripts/collect-core-verification.ps1 -Interactive` 输出摘要。
 - 如果修改 UI，请附上截图或说明主要变化。
 
 ## 亮度控制相关注意事项

@@ -171,6 +171,14 @@ Use this checklist before claiming a device is supported.
 Windows PowerShell:
 
 ```powershell
+.\scripts\collect-core-verification.ps1 -Interactive
+```
+
+The script writes a local `diagnostics/core-verification-*` bundle containing device properties, package details, brightness settings, sensor service output, service state, and filtered app logs. The `diagnostics/` directory is ignored by git.
+
+Manual commands:
+
+```powershell
 adb shell settings get system screen_brightness_mode
 adb shell settings get system screen_brightness
 adb shell dumpsys sensorservice | Select-String "com.evan.brightnesscurve|Light|Ambient"
@@ -226,4 +234,4 @@ It should collect:
 - sensor service evidence
 - recent app logcat lines
 
-The script should not be treated as complete until it has been run on at least one physical device.
+Current status: script added. It still needs to be run on at least one physical device and refined from real output.

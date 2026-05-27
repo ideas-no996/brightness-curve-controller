@@ -217,9 +217,10 @@ app/src/main/java/com/evan/brightnesscurve/
 ```powershell
 .\scripts\test-and-build.ps1
 .\scripts\install-debug.ps1
+.\scripts\collect-core-verification.ps1 -Interactive
 ```
 
-这些脚本包含本机 Android SDK/JDK 路径，仅作为 Windows 本机开发便利入口。通用构建请优先使用 Gradle Wrapper：
+这些脚本仅作为 Windows 本机开发便利入口。`collect-core-verification.ps1` 会把 adb 采集结果写入本地 `diagnostics/` 目录，该目录不会提交到 git。通用构建请优先使用 Gradle Wrapper：
 
 ```powershell
 .\gradlew.bat testDebugUnitTest assembleDebug
