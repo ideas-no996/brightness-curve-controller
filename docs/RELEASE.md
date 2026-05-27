@@ -87,7 +87,44 @@ SHA256SUMS.txt
 
 Release notes 会从 `CHANGELOG.md` 中匹配 tag 的段落提取。例如 tag `v1.0.0` 会读取 `## v1.0.0` 到下一个 `##` 标题之间的内容。
 
-## 5. 如果发布失败
+## 5. 发布前验收
+
+发布前至少完成：
+
+- `./gradlew testDebugUnitTest assembleDebug`
+- `git diff --check`
+- 更新 `CHANGELOG.md`
+- 确认 README 没有扩大设备兼容性承诺
+- 如果改动影响亮度控制，按 [../CORE_FUNCTION_VERIFICATION.md](../CORE_FUNCTION_VERIFICATION.md) 做一次真机核心闭环验收
+
+Release notes 应写清楚：
+
+- 修复或新增了什么
+- 是否改动亮度控制链路
+- 是否做过真机核心闭环验收
+- 已验证设备型号和 Android/vendor 版本
+
+如果没有做真机核心闭环验收，Release notes 应明确说明。
+
+## 6. 校验 Release APK
+
+Release 会上传 `SHA256SUMS.txt`。手动安装 APK 前建议核对 SHA-256。
+
+Windows PowerShell：
+
+```powershell
+Get-FileHash .\BrightnessCurveController-<version>.apk -Algorithm SHA256
+```
+
+macOS / Linux：
+
+```bash
+sha256sum BrightnessCurveController-<version>.apk
+```
+
+把输出值和 `SHA256SUMS.txt` 中的值对比。值一致只能证明下载完整性，不等于证明设备兼容性。
+
+## 7. 如果发布失败
 
 先检查：
 

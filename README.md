@@ -2,7 +2,7 @@
 
 一个非 root Android 亮度曲线控制器。它读取环境光传感器的 lux，根据个人化亮度曲线写入系统屏幕亮度，让亮度调节更接近“我现在看着舒服”，而不是只依赖系统默认自动亮度。
 
-> 当前项目仍处于早期阶段，已经可以在 OPPO/ColorOS 平板上读取环境光并写入系统亮度。欢迎测试、反馈和改进。
+> 当前项目是实验性工具。它已经可以在一台 OPPO/ColorOS 平板上读取环境光并写入系统亮度，但还没有完成多设备验证。Android 8.0+ 是技术安装目标，不是广泛兼容承诺。
 
 ## 功能特性
 
@@ -14,11 +14,11 @@
 - 调试信息默认折叠，保留 raw lux、平滑 lux、目标亮度、写入亮度。
 - 响应策略包含 EMA 平滑、写入节流、死区和亮度渐变，避免频繁跳变。
 - 包含 adaptive launcher icon。
-- 支持在 App 设置页检查 GitHub Release 更新、下载 APK，并调起系统安装确认页。
+- 支持在 App 设置页手动检查 GitHub Release 更新、下载 APK，并调起系统安装确认页。更新功能是可选的，亮度控制本身不需要联网。
 
 ## 适用设备
 
-理论上适用于 Android 8.0+，但不同厂商对系统亮度、后台服务和传感器的限制不同。
+本项目的 `minSdk` 是 Android 8.0，但真实可用性取决于设备光线传感器、系统亮度实现、前台服务策略和厂商电池限制。请把它视为“已在少量设备验证的实验性工具”，不要把 Android 8.0+ 理解为完整支持范围。
 
 已验证环境：
 
@@ -27,6 +27,14 @@
 - 用户已手动授予“修改系统设置”权限
 
 更多设备记录和手动测试项见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
+
+支持状态按证据分级：
+
+- `Installs`：可以安装和启动，但没有验证核心亮度闭环。
+- `Sensor Verified`：可以注册 `TYPE_LIGHT` 并收到 lux。
+- `Brightness Write Verified`：手动调节能写入并回读系统亮度。
+- `Core Loop Verified`：自动控制完成 lux -> 曲线 -> 写入 -> 回读 -> UI 状态。
+- `Stable Candidate`：核心闭环经过重启、息屏/亮屏和日常使用验证。
 
 ## 权限说明
 
@@ -41,9 +49,28 @@
 
 启用控制器后，App 会把系统亮度模式切换到手动模式，并由前台服务持续调整亮度。停止服务时会尝试恢复启用前的亮度模式和亮度值。
 
-应用内更新不会静默安装 APK。Android 会要求用户允许“安装未知应用”，并在系统安装器里确认安装。
+`INTERNET` 和 `REQUEST_INSTALL_PACKAGES` 只用于可选的应用内更新。你可以完全不使用更新功能，亮度控制仍然在本地工作。应用内更新不会静默安装 APK；Android 会要求用户允许“安装未知应用”，并在系统安装器里确认安装。
 
 隐私说明见 [PRIVACY.md](PRIVACY.md)。
+
+## 核心功能验证
+
+本项目最重要的验收标准不是 UI 是否好看，而是这条链路是否成立：
+
+```text
+环境光 lux -> 曲线计算 -> 目标亮度 -> 写入系统亮度 -> 回读确认 -> UI 状态
+```
+
+修复或报告亮度控制问题时，请优先检查：
+
+- `WRITE_SETTINGS` 是否真的授权。
+- 当前系统亮度模式是手动还是自动。
+- 当前系统亮度值是否是 0-255。
+- 是否检测到 `TYPE_LIGHT` 光线传感器。
+- 最近一次 lux、目标亮度、写入目标值和回读值。
+- 如果写入失败，UI 是否显示具体原因。
+
+完整验收清单见 [CORE_FUNCTION_VERIFICATION.md](CORE_FUNCTION_VERIFICATION.md)。严格审计和后续修复计划见 [STRICT_REVIEW.md](STRICT_REVIEW.md) 与 [NEXT_10_FIXES.md](NEXT_10_FIXES.md)。
 
 ## 快速开始
 
@@ -146,6 +173,22 @@ App 设置页的“软件更新”会读取最新 GitHub Release，并查找这�
 
 Release 会同时上传 `SHA256SUMS.txt`，用于核对 APK 下载完整性。Release notes 会从 [CHANGELOG.md](CHANGELOG.md) 中对应版本段落生成。
 
+手动下载 APK 后，建议核对 SHA-256。
+
+Windows PowerShell：
+
+```powershell
+Get-FileHash .\BrightnessCurveController-<version>.apk -Algorithm SHA256
+```
+
+macOS / Linux：
+
+```bash
+sha256sum BrightnessCurveController-<version>.apk
+```
+
+将输出值与 Release 中的 `SHA256SUMS.txt` 对比后再安装。
+
 不要提交 keystore、密码、alias 或本地 signing 配置文件。
 
 更详细的一步一步说明见 [docs/RELEASE.md](docs/RELEASE.md)。
@@ -182,15 +225,19 @@ app/src/main/java/com/evan/brightnesscurve/
 .\gradlew.bat testDebugUnitTest assembleDebug
 ```
 
-## 开源路线图
+## 成熟度和路线图
 
-- 增加更多设备兼容性测试。
+当前 `v1.0.x` 是已经发布的历史版本号，但项目成熟度仍按实验性工具处理。后续版本是否继续使用 `v1.0.x`，还是转为 `v0.2.x` 直到多设备验证完成，会在后续 release policy 中明确。
+
+优先路线：
+
+- 增加核心闭环验收脚本和真机测试记录。
+- 增加一键复制/导出诊断报告。
+- 收缩并明确设备兼容性声明。
+- 加固 Release APK 校验、签名和安装风险说明。
+- 根据真实设备反馈优化亮度响应策略。
 - 增加导入/导出亮度曲线。
 - 增加可视化曲线编辑体验。
-- 增加更明确的首次启动引导。
-- 增加 Release APK 自动构建。
-- 增强应用内更新体验。
-- 根据真实使用反馈优化亮度响应策略。
 
 ## 贡献
 

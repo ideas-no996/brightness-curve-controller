@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping test Brightness Curve Controller. Device details matter a lot for brightness and sensor bugs.
+        Thanks for helping test Brightness Curve Controller. Device details matter a lot for brightness and sensor bugs. For core brightness failures, please compare your result with CORE_FUNCTION_VERIFICATION.md.
   - type: input
     id: app_version
     attributes:
@@ -60,8 +60,22 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: Paste or screenshot Settings -> Diagnostics if possible.
-      placeholder: "runtimeStatus, hasLightSensor, sensorName, lastLux, canWriteSettings, brightnessMode, failureReason, lastError"
+      description: Paste or screenshot Settings -> Diagnostics if possible. Include the write target and read-back fields for brightness bugs.
+      placeholder: "runtimeStatus, hasLightSensor, sensorName, lastLux, targetBrightnessPercent, currentSystemBrightness, lastWriteTargetValue, lastWriteReadBackValue, lastWriteSucceeded, canWriteSettings, brightnessMode, failureReason, lastError"
+  - type: dropdown
+    id: verification_level
+    attributes:
+      label: Verification level reached
+      description: See docs/COMPATIBILITY.md for definitions.
+      options:
+        - "Installs"
+        - "Sensor Verified"
+        - "Brightness Write Verified"
+        - "Core Loop Verified"
+        - "Stable Candidate"
+        - "Not sure"
+    validations:
+      required: true
   - type: textarea
     id: logs
     attributes:

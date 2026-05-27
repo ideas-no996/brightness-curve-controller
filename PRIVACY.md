@@ -31,6 +31,8 @@ The app uses the internet only for the in-app update flow:
 
 The app does not upload sensor readings, brightness settings, presets, device identifiers, or usage analytics.
 
+Update checking is optional. Brightness control, light-sensor reading, curve calculation, and system brightness writes work without network access.
+
 ## Permissions
 
 - `WRITE_SETTINGS`: lets the app write Android system brightness.
@@ -40,9 +42,13 @@ The app does not upload sensor readings, brightness settings, presets, device id
 - `INTERNET`: checks and downloads GitHub Release updates.
 - `REQUEST_INSTALL_PACKAGES`: opens Android's installer for downloaded APK updates after user confirmation.
 
+`INTERNET` and `REQUEST_INSTALL_PACKAGES` are not used for brightness control. They exist only because the app includes an optional GitHub Release update flow.
+
 ## Update Installation
 
 The app cannot silently install updates. Android always shows the system installer, and you must confirm installation.
+
+Release APKs include a `SHA256SUMS.txt` file on GitHub Releases so you can verify download integrity before manual installation.
 
 ## Logs And Bug Reports
 
