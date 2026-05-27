@@ -82,7 +82,10 @@ GitHub Actions 会创建或更新 `v1.0.0` 对应的 Release，并上传：
 
 ```text
 BrightnessCurveController-1.0.0.apk
+SHA256SUMS.txt
 ```
+
+Release notes 会从 `CHANGELOG.md` 中匹配 tag 的段落提取。例如 tag `v1.0.0` 会读取 `## v1.0.0` 到下一个 `##` 标题之间的内容。
 
 ## 5. 如果发布失败
 
@@ -92,3 +95,4 @@ BrightnessCurveController-1.0.0.apk
 - Secret 名称是否完全一致。
 - `ANDROID_KEYSTORE_BASE64` 是否来自 keystore 文件本身，不是文件路径。
 - tag 是否匹配 `v*.*.*`，例如 `v1.0.0`。
+- `CHANGELOG.md` 是否包含对应的 `## vX.Y.Z` 段落；缺失时会使用默认 release note。

@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a crash, wrong brightness behavior, permission problem, or device compatibility issue.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping test Brightness Curve Controller. Device details matter a lot for brightness and sensor bugs.
+  - type: input
+    id: app_version
+    attributes:
+      label: App version
+      placeholder: "Example: 1.0.2"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      placeholder: "Example: OPPO Pad / Pixel 8 / Galaxy S23"
+    validations:
+      required: true
+  - type: input
+    id: android_version
+    attributes:
+      label: Android version and vendor skin
+      placeholder: "Example: Android 14, ColorOS 14"
+    validations:
+      required: true
+  - type: dropdown
+    id: write_settings
+    attributes:
+      label: Is "modify system settings" granted?
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: symptoms
+    attributes:
+      label: What happened?
+      description: Describe the visible behavior, expected behavior, and how often it happens.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the app
+        2. Grant WRITE_SETTINGS
+        3. Turn on automatic control
+        4. ...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste or screenshot Settings -> Diagnostics if possible.
+      placeholder: "runtimeStatus, hasLightSensor, sensorName, lastLux, canWriteSettings, brightnessMode, failureReason, lastError"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Optional adb logcat lines related to AndroidRuntime, BrightnessControlService, or com.evan.brightnesscurve.
+      render: text

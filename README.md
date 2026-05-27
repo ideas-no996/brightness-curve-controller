@@ -26,6 +26,8 @@
 - Android 设备已开启 USB 调试
 - 用户已手动授予“修改系统设置”权限
 
+更多设备记录和手动测试项见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
+
 ## 权限说明
 
 本项目不需要 root，但需要用户手动授予：
@@ -40,6 +42,8 @@
 启用控制器后，App 会把系统亮度模式切换到手动模式，并由前台服务持续调整亮度。停止服务时会尝试恢复启用前的亮度模式和亮度值。
 
 应用内更新不会静默安装 APK。Android 会要求用户允许“安装未知应用”，并在系统安装器里确认安装。
+
+隐私说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 快速开始
 
@@ -140,11 +144,15 @@ BrightnessCurveController-1.0.0.apk
 
 App 设置页的“软件更新”会读取最新 GitHub Release，并查找这个命名格式的 APK。发布新版本时继续使用 `v*.*.*` tag，例如 `v1.0.1`。
 
+Release 会同时上传 `SHA256SUMS.txt`，用于核对 APK 下载完整性。Release notes 会从 [CHANGELOG.md](CHANGELOG.md) 中对应版本段落生成。
+
 不要提交 keystore、密码、alias 或本地 signing 配置文件。
 
 更详细的一步一步说明见 [docs/RELEASE.md](docs/RELEASE.md)。
 
 版本修改记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+常见问题见 [docs/FAQ.md](docs/FAQ.md)。
 
 ## 项目结构
 
