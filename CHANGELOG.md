@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.0.4
+
+This release fixes a critical regression in the core system-brightness control path. It restores the full ambient-light to curve calculation to system brightness write-back loop.
+
+### Critical Fixes
+
+- Restored real system brightness writes for manual controls and automatic ambient-light adjustment.
+- Ensured brightness writes use Android's 0-255 `Settings.System.SCREEN_BRIGHTNESS` range.
+- Switched Android to `SCREEN_BRIGHTNESS_MODE_MANUAL` before writing system brightness, then read back the mode and brightness value for confirmation.
+- Fixed the comfort slider and quick adjustment buttons so they write system brightness directly instead of only updating preferences or calibration state.
+- Added explicit diagnostics for target system brightness, read-back system brightness, write success, brightness mode, and write errors.
+- Added brightness-chain logs for lux, target percent, target system value, write permission, brightness mode, write success, and read-back brightness.
+- Added tests for percent-to-system-brightness conversion and runtime write diagnostics.
+
 ## v1.0.3
 
 This release focuses on making automatic brightness control more reliable, easier to diagnose, and easier to maintain.
