@@ -104,7 +104,7 @@ Current state:
 
 Recommended fix:
 
-- Add `docs/CORE_FUNCTION_VERIFICATION.md` or keep this audit document as the seed.
+- Add `docs/verification/CORE_FUNCTION_VERIFICATION.md` or keep this audit document as the seed.
 - Add `scripts/collect-diagnostics.ps1`.
 - Add app-side "Copy diagnostic report."
 - Require the report for compatibility claims.

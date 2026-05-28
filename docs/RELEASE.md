@@ -95,7 +95,7 @@ Release notes 会从 `CHANGELOG.md` 中匹配 tag 的段落提取。例如 tag `
 - `git diff --check`
 - 更新 `CHANGELOG.md`
 - 确认 README 没有扩大设备兼容性承诺
-- 如果改动影响亮度控制，按 [../CORE_FUNCTION_VERIFICATION.md](../CORE_FUNCTION_VERIFICATION.md) 做一次真机核心闭环验收
+- 如果改动影响亮度控制，按 [verification/CORE_FUNCTION_VERIFICATION.md](verification/CORE_FUNCTION_VERIFICATION.md) 做一次真机核心闭环验收
 
 Release notes 应写清楚：
 

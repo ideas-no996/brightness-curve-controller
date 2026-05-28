@@ -211,11 +211,11 @@ Create strict audit documents. No Kotlin code changes.
 
 Deliverables:
 
-- `STRICT_REVIEW.md`
-- `TRUST_RISK.md`
-- `CORE_FUNCTION_VERIFICATION.md`
-- `COMPATIBILITY_LIMITS.md`
-- `NEXT_10_FIXES.md`
+- [STRICT_REVIEW.md](STRICT_REVIEW.md)
+- [TRUST_RISK.md](TRUST_RISK.md)
+- [../verification/CORE_FUNCTION_VERIFICATION.md](../verification/CORE_FUNCTION_VERIFICATION.md)
+- [../verification/COMPATIBILITY_LIMITS.md](../verification/COMPATIBILITY_LIMITS.md)
+- [../engineering/NEXT_10_FIXES.md](../engineering/NEXT_10_FIXES.md)
 
 ### Phase 2: Trust Documentation And Repository Metadata
 

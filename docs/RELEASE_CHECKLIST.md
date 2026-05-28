@@ -15,7 +15,7 @@ Use this checklist before publishing a new APK. The goal is to avoid shipping re
 
 - README compatibility wording remains conservative.
 - Release notes do not claim broad Android support.
-- If the APK changes runtime brightness behavior, run the core loop checklist in `CORE_FUNCTION_VERIFICATION.md`.
+- If the APK changes runtime brightness behavior, run the core loop checklist in [verification/CORE_FUNCTION_VERIFICATION.md](verification/CORE_FUNCTION_VERIFICATION.md).
 - If a physical-device core loop test was not run, the release notes must say so.
 - If a physical-device test was run, record:
   - device model

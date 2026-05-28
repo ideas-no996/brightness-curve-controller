@@ -38,7 +38,7 @@ Run these checks before reporting a device as `Core Loop Verified`:
 9. App restart preserves presets and auto-control preference.
 10. Optional: start-on-boot resumes control after reboot.
 
-For the full core-loop checklist, see [../CORE_FUNCTION_VERIFICATION.md](../CORE_FUNCTION_VERIFICATION.md).
+For the full core-loop checklist, see [verification/CORE_FUNCTION_VERIFICATION.md](verification/CORE_FUNCTION_VERIFICATION.md).
 
 ## Issue Report Data
 

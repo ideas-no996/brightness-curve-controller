@@ -49,7 +49,7 @@ Type: documentation
 
 Action:
 
-- Convert `CORE_FUNCTION_VERIFICATION.md` into the canonical device acceptance checklist.
+- Convert [../verification/CORE_FUNCTION_VERIFICATION.md](../verification/CORE_FUNCTION_VERIFICATION.md) into the canonical device acceptance checklist.
 - Link it from README and issue templates.
 
 Acceptance:
