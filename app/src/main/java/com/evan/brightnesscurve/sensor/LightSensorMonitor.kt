@@ -28,6 +28,9 @@ class LightSensorMonitor(
     private val lightSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
     private var registered = false
 
+    val isRegistered: Boolean
+        get() = registered
+
     fun start(): Boolean {
         val sensor = lightSensor
         if (sensor == null) {
@@ -41,6 +44,10 @@ class LightSensorMonitor(
             Log.i(
                 TAG,
                 "register TYPE_LIGHT sensor name=${sensor.name}, vendor=${sensor.vendor}, samplingUs=$SENSOR_SAMPLING_US, registered=$registered"
+            )
+            Log.d(
+                AUTO_TAG,
+                "sensorRegistered=$registered sensor=${sensor.name} vendor=${sensor.vendor} samplingUs=$SENSOR_SAMPLING_US"
             )
             onStatus(
                 LightSensorStatus(
@@ -60,6 +67,7 @@ class LightSensorMonitor(
     fun stop() {
         if (registered) {
             Log.i(TAG, "unregister TYPE_LIGHT sensor")
+            Log.d(AUTO_TAG, "sensorRegistered=false reason=stop")
             sensorManager.unregisterListener(this)
             registered = false
         }
@@ -76,6 +84,7 @@ class LightSensorMonitor(
             TAG,
             "lux=$lux, sensor=${event.sensor.name}, sensorTimestamp=${event.timestamp}, receivedAt=${System.currentTimeMillis()}"
         )
+        Log.d(AUTO_TAG, "lux=$lux sensor=${event.sensor.name} onSensorChanged=true")
         onSample(
             LightSensorSample(
                 lux = lux,
@@ -90,6 +99,7 @@ class LightSensorMonitor(
 
     companion object {
         private const val TAG = "LightSensorMonitor"
+        private const val AUTO_TAG = "AutoBrightness"
         private const val SENSOR_SAMPLING_US = 250_000
     }
 }

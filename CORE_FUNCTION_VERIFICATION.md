@@ -181,7 +181,7 @@ adb shell settings get system screen_brightness_mode
 adb shell settings get system screen_brightness
 adb shell dumpsys sensorservice | Select-String "com.evan.brightnesscurve|Light|Ambient"
 adb shell dumpsys activity services com.evan.brightnesscurve | Select-String "BrightnessControlService|foreground"
-adb logcat -d -t 1000 | Select-String "BrightnessControlService|BrightnessController|LightSensorMonitor|MainViewModel"
+adb logcat -d -t 1000 | Select-String "AutoBrightness|BrightnessControlService|BrightnessController|LightSensorMonitor|MainViewModel"
 ```
 
 These commands are not enough by themselves. They must be paired with UI diagnostics and real brightness changes.

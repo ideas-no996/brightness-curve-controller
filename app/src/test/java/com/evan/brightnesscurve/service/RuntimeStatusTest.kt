@@ -108,6 +108,13 @@ class RuntimeStatusTest {
                 activePresetName = "Preset",
                 targetPercent = null,
                 targetSystemValue = null,
+                currentPercent = 42f,
+                deltaPercent = null,
+                systemDelta = null,
+                deadbandPercent = 1f,
+                minSystemDelta = 2,
+                throttleMillis = 220L,
+                elapsedSinceLastWriteMillis = 1000L,
                 preserveExistingTargetPercent = true,
                 canWriteSettings = true,
                 brightnessMode = 0,
@@ -134,6 +141,13 @@ class RuntimeStatusTest {
                 activePresetName = "Preset",
                 targetPercent = 50f,
                 targetSystemValue = 128,
+                currentPercent = 46f,
+                deltaPercent = 4f,
+                systemDelta = 10,
+                deadbandPercent = 1f,
+                minSystemDelta = 2,
+                throttleMillis = 220L,
+                elapsedSinceLastWriteMillis = 1000L,
                 preserveExistingTargetPercent = false,
                 canWriteSettings = true,
                 brightnessMode = 0,
@@ -147,6 +161,12 @@ class RuntimeStatusTest {
         assertEquals(50f, snapshot.targetPercent)
         assertEquals(128, snapshot.targetSystemValue)
         assertEquals("Throttled", snapshot.lastNoWriteReason)
+        assertEquals(1000L, snapshot.lastAutoEvaluateTime)
+        assertEquals(46f, snapshot.lastDecisionCurrentPercent)
+        assertEquals(4f, snapshot.lastDecisionDeltaPercent)
+        assertEquals(10, snapshot.lastDecisionSystemDelta)
+        assertEquals(1f, snapshot.lastDecisionDeadbandPercent)
+        assertEquals(220L, snapshot.lastDecisionThrottleMillis)
     }
 
     @Test
@@ -199,6 +219,7 @@ class RuntimeStatusTest {
         assertEquals(128, snapshot.lastWriteTargetValue)
         assertEquals(128, snapshot.lastWriteReadBackValue)
         assertEquals(true, snapshot.lastWriteSucceeded)
+        assertEquals(true, snapshot.lastBrightnessWriteTime != null)
         assertEquals(null, snapshot.lastError)
     }
 }

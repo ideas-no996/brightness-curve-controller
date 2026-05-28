@@ -51,6 +51,7 @@ class BrightnessControlService : Service() {
     private var allowOutdoorFull: Boolean = true
     private var minAllowedPercent: Float = 3f
     private var maxAllowedPercent: Float = 100f
+    private var autoControlEnabled: Boolean = false
     private var responseSpeed: ResponseSpeed = ResponseSpeed.Standard
     private val brightnessEngine = BrightnessCurveEngine()
     private var lastWrittenPercent: Float? = null
@@ -85,6 +86,7 @@ class BrightnessControlService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.d(AUTO_TAG, "serviceRunning=true lifecycle=onCreate")
         app = application as BrightnessCurveApp
         brightnessController = BrightnessController(this)
         val sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
@@ -116,6 +118,7 @@ class BrightnessControlService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(AUTO_TAG, "serviceRunning=true lifecycle=onStartCommand action=${intent?.action} startId=$startId")
         if (intent?.action == ServiceActions.ACTION_STOP) {
             runBlocking(Dispatchers.IO) {
                 app.preferencesRepository.setAutoControlEnabled(false)
@@ -128,6 +131,21 @@ class BrightnessControlService : Service() {
         }
 
         serviceScope.launch(Dispatchers.IO) {
+            val settings = app.preferencesRepository.currentSettings()
+            autoControlEnabled = settings.autoControlEnabled
+            Log.d(
+                AUTO_TAG,
+                "serviceRunning=true autoEnabled=$autoControlEnabled lifecycle=startCommandSettings"
+            )
+            if (!autoControlEnabled) {
+                BrightnessRuntimeState.dispatch(
+                    RuntimeEvent.AutoEnabledChanged(desiredAutoControlEnabled = false)
+                )
+                Log.d(AUTO_TAG, "serviceRunning=true autoEnabled=false shouldApply=false reason=AutoDisabled")
+                stopSelf()
+                return@launch
+            }
+
             if (!brightnessController.canWrite()) {
                 BrightnessRuntimeState.dispatch(
                     RuntimeEvent.ServicePermissionMissing(
@@ -147,6 +165,7 @@ class BrightnessControlService : Service() {
     }
 
     override fun onDestroy() {
+        Log.d(AUTO_TAG, "serviceRunning=false lifecycle=onDestroy sensorRegistered=${lightSensorMonitor?.isRegistered}")
         luxTimeoutJob?.cancel()
         lightSensorMonitor?.stop()
         unregisterReceiver(screenReceiver)
@@ -165,6 +184,10 @@ class BrightnessControlService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun handleLightSensorStatus(status: LightSensorStatus) {
+        Log.d(
+            AUTO_TAG,
+            "serviceRunning=true autoEnabled=$autoControlEnabled sensorRegistered=${status.isRegistered} sensor=${status.sensorName}"
+        )
         BrightnessRuntimeState.dispatch(
             RuntimeEvent.ServiceSensorStatusChanged(
                 hasLightSensor = status.hasLightSensor,
@@ -183,11 +206,51 @@ class BrightnessControlService : Service() {
         val now = SystemClock.elapsedRealtime()
         val mode = readModeOrNull()
         val canWrite = brightnessController.canWrite()
+        val sensorRegistered = lightSensorMonitor?.isRegistered == true
 
         Log.d(
             TAG,
             "service lux=$rawLux, sensor=${sample.sensorName}, preset=${preset?.name}, canWrite=$canWrite, mode=$mode"
         )
+        Log.d(
+            AUTO_TAG,
+            "serviceRunning=true autoEnabled=$autoControlEnabled sensorRegistered=$sensorRegistered lux=$rawLux"
+        )
+
+        if (!autoControlEnabled) {
+            val smoothedLux = brightnessEngine.observeLux(rawLux, responseSpeed)
+            Log.d(
+                AUTO_TAG,
+                "serviceRunning=true autoEnabled=false sensorRegistered=$sensorRegistered lux=$rawLux " +
+                    "shouldApply=false reason=AutoDisabled"
+            )
+            BrightnessRuntimeState.dispatch(
+                RuntimeEvent.ServiceLuxObserved(
+                    rawLux = rawLux,
+                    smoothedLux = smoothedLux,
+                    receivedAtMillis = sample.receivedAtMillis,
+                    sensorName = sample.sensorName,
+                    activePresetName = preset?.name,
+                    targetPercent = null,
+                    targetSystemValue = null,
+                    currentPercent = lastWrittenPercent,
+                    deltaPercent = null,
+                    systemDelta = null,
+                    deadbandPercent = brightnessEngine.minPercentDelta,
+                    minSystemDelta = brightnessEngine.minSystemDelta,
+                    throttleMillis = brightnessEngine.minWriteIntervalMillis,
+                    elapsedSinceLastWriteMillis = now - lastWriteElapsed,
+                    preserveExistingTargetPercent = true,
+                    canWriteSettings = canWrite,
+                    brightnessMode = mode,
+                    noWriteReason = "AutoDisabled",
+                    message = "已读取环境光，但自动控制未开启",
+                    lastError = null,
+                    isPausedForScreenOff = false
+                )
+            )
+            return
+        }
 
         if (preset == null) {
             val smoothedLux = brightnessEngine.observeLux(rawLux, responseSpeed)
@@ -200,6 +263,13 @@ class BrightnessControlService : Service() {
                     activePresetName = null,
                     targetPercent = null,
                     targetSystemValue = null,
+                    currentPercent = lastWrittenPercent,
+                    deltaPercent = null,
+                    systemDelta = null,
+                    deadbandPercent = brightnessEngine.minPercentDelta,
+                    minSystemDelta = brightnessEngine.minSystemDelta,
+                    throttleMillis = brightnessEngine.minWriteIntervalMillis,
+                    elapsedSinceLastWriteMillis = now - lastWriteElapsed,
                     preserveExistingTargetPercent = false,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
@@ -223,6 +293,13 @@ class BrightnessControlService : Service() {
                     activePresetName = preset.name,
                     targetPercent = null,
                     targetSystemValue = null,
+                    currentPercent = lastWrittenPercent,
+                    deltaPercent = null,
+                    systemDelta = null,
+                    deadbandPercent = brightnessEngine.minPercentDelta,
+                    minSystemDelta = brightnessEngine.minSystemDelta,
+                    throttleMillis = brightnessEngine.minWriteIntervalMillis,
+                    elapsedSinceLastWriteMillis = now - lastWriteElapsed,
                     preserveExistingTargetPercent = true,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
@@ -259,6 +336,13 @@ class BrightnessControlService : Service() {
                     activePresetName = preset.name,
                     targetPercent = null,
                     targetSystemValue = null,
+                    currentPercent = lastWrittenPercent,
+                    deltaPercent = null,
+                    systemDelta = null,
+                    deadbandPercent = brightnessEngine.minPercentDelta,
+                    minSystemDelta = brightnessEngine.minSystemDelta,
+                    throttleMillis = brightnessEngine.minWriteIntervalMillis,
+                    elapsedSinceLastWriteMillis = now - lastWriteElapsed,
                     preserveExistingTargetPercent = true,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
@@ -282,6 +366,13 @@ class BrightnessControlService : Service() {
                     activePresetName = preset.name,
                     targetPercent = null,
                     targetSystemValue = null,
+                    currentPercent = lastWrittenPercent,
+                    deltaPercent = null,
+                    systemDelta = null,
+                    deadbandPercent = brightnessEngine.minPercentDelta,
+                    minSystemDelta = brightnessEngine.minSystemDelta,
+                    throttleMillis = brightnessEngine.minWriteIntervalMillis,
+                    elapsedSinceLastWriteMillis = now - lastWriteElapsed,
                     preserveExistingTargetPercent = true,
                     canWriteSettings = canWrite,
                     brightnessMode = mode,
@@ -304,6 +395,15 @@ class BrightnessControlService : Service() {
                 "targetSystemBrightness=$targetSystemValue, canWriteSettings=$canWrite, " +
                 "brightnessMode=$mode, shouldWrite=$shouldWrite, noWriteReason=${decision.noWriteReason}"
         )
+        Log.d(
+            AUTO_TAG,
+            "serviceRunning=true autoEnabled=$autoControlEnabled sensorRegistered=$sensorRegistered " +
+                "lux=${decision.rawLux} targetPercent=$targetPercent currentPercent=${decision.currentPercent} " +
+                "delta=${decision.deltaPercent} deadband=${decision.minPercentDelta} " +
+                "systemDelta=${decision.systemDelta} minSystemDelta=${decision.minSystemDelta} " +
+                "throttleMs=${decision.minWriteIntervalMillis} elapsedMs=${decision.elapsedSinceLastWriteMillis} " +
+                "shouldApply=$shouldWrite reason=${decision.noWriteReason ?: "Apply"}"
+        )
 
         BrightnessRuntimeState.dispatch(
             RuntimeEvent.ServiceLuxObserved(
@@ -314,6 +414,13 @@ class BrightnessControlService : Service() {
                 activePresetName = preset.name,
                 targetPercent = targetPercent,
                 targetSystemValue = targetSystemValue,
+                currentPercent = decision.currentPercent,
+                deltaPercent = decision.deltaPercent,
+                systemDelta = decision.systemDelta,
+                deadbandPercent = decision.minPercentDelta,
+                minSystemDelta = decision.minSystemDelta,
+                throttleMillis = decision.minWriteIntervalMillis,
+                elapsedSinceLastWriteMillis = decision.elapsedSinceLastWriteMillis,
                 preserveExistingTargetPercent = false,
                 canWriteSettings = canWrite,
                 brightnessMode = mode,
@@ -340,6 +447,10 @@ class BrightnessControlService : Service() {
                             currentBrightnessValue = brightnessController.readBrightness()
                         )
                     )
+                    Log.d(
+                        AUTO_TAG,
+                        "writeSuccess=false reason=PermissionLost readBackBrightness=${brightnessController.readBrightness()}"
+                    )
                     return@withLock
                 }
                 runCatching {
@@ -351,6 +462,11 @@ class BrightnessControlService : Service() {
                             "targetSystemBrightness=${result.targetSystemValue}, " +
                             "canWriteSettings=true, brightnessMode=${result.brightnessMode}, " +
                             "writeSuccess=true, readBackBrightness=${result.readBackSystemValue}"
+                    )
+                    Log.d(
+                        AUTO_TAG,
+                        "writeSuccess=true readBackBrightness=${result.readBackSystemValue} " +
+                            "targetPercent=${result.targetPercent} targetSystemBrightness=${result.targetSystemValue}"
                     )
                     lastWrittenPercent = targetPercent
                     lastWriteElapsed = SystemClock.elapsedRealtime()
@@ -372,6 +488,10 @@ class BrightnessControlService : Service() {
                             "canWriteSettings=$canWrite, brightnessMode=${readModeOrNull()}, " +
                             "writeSuccess=false, readBackBrightness=${brightnessController.readBrightness()}",
                         throwable
+                    )
+                    Log.d(
+                        AUTO_TAG,
+                        "writeSuccess=false readBackBrightness=${brightnessController.readBrightness()} reason=$error"
                     )
                     BrightnessRuntimeState.dispatch(
                         RuntimeEvent.ServiceBrightnessWriteFailed(
@@ -411,6 +531,8 @@ class BrightnessControlService : Service() {
 
         serviceScope.launch {
             app.preferencesRepository.settings.collectLatest { settings ->
+                val previousAutoEnabled = autoControlEnabled
+                autoControlEnabled = settings.autoControlEnabled
                 allowOutdoorFull = settings.allowOutdoorFull
                 minAllowedPercent = settings.minAllowedPercent
                 maxAllowedPercent = settings.maxAllowedPercent
@@ -421,6 +543,15 @@ class BrightnessControlService : Service() {
                         desiredAutoControlEnabled = settings.autoControlEnabled
                     )
                 )
+                Log.d(
+                    AUTO_TAG,
+                    "serviceRunning=true autoEnabled=$autoControlEnabled previousAutoEnabled=$previousAutoEnabled " +
+                        "minPercent=$minAllowedPercent maxPercent=$maxAllowedPercent response=${responseSpeed.name}"
+                )
+                if (!settings.autoControlEnabled) {
+                    Log.d(AUTO_TAG, "serviceRunning=true autoEnabled=false shouldApply=false reason=SettingsDisabled")
+                    stopSelf()
+                }
             }
         }
     }
@@ -443,6 +574,7 @@ class BrightnessControlService : Service() {
     }
 
     private fun startSensor() {
+        Log.d(AUTO_TAG, "serviceRunning=true autoEnabled=$autoControlEnabled lifecycle=startSensor")
         if (brightnessController.isAutoMode()) {
             BrightnessRuntimeState.dispatch(
                 RuntimeEvent.ServiceStartAnnounced("当前系统为自动亮度；启动后会切换为手动亮度控制")
@@ -450,6 +582,7 @@ class BrightnessControlService : Service() {
         }
         lastWrittenPercent = brightnessController.readBrightnessPercent()
         val started = lightSensorMonitor?.start() == true
+        Log.d(AUTO_TAG, "serviceRunning=$started autoEnabled=$autoControlEnabled sensorRegistered=${lightSensorMonitor?.isRegistered}")
         sensorStartedAtMillis = System.currentTimeMillis()
         if (started) scheduleLuxTimeout()
         BrightnessRuntimeState.dispatch(
@@ -529,6 +662,7 @@ class BrightnessControlService : Service() {
 
     companion object {
         private const val TAG = "BrightnessControlService"
+        private const val AUTO_TAG = "AutoBrightness"
         private const val CHANNEL_ID = "brightness_curve_controller"
         private const val NOTIFICATION_ID = 20
         private const val LUX_TIMEOUT_MS = 5_000L

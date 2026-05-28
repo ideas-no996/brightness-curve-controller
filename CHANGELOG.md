@@ -13,6 +13,9 @@
 - Clarified in-app update permissions and current-window brightness preview behavior.
 - Added in-app SHA-256 verification for downloaded release APKs before installer handoff.
 - Added target system brightness and no-write reason to runtime diagnostics and copied diagnostic reports.
+- Added automatic background adjustment diagnosis for the foreground service, light sensor, decision, and write path.
+- Added unified `AutoBrightness` logs and runtime fields for automatic evaluation/write timing, delta, deadband, throttle, and skip reason.
+- Made the foreground service reconcile persisted `autoControlEnabled` on start, so sticky service restarts cannot silently run with stale automatic-control state.
 
 Compatibility note:
 This remains an experimental Android brightness utility. Android 8.0+ is the technical minSdk, not a broad device support guarantee.

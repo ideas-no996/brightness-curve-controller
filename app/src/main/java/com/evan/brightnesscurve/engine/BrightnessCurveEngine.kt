@@ -16,15 +16,22 @@ data class BrightnessCurveDecision(
     val smoothedLux: Float,
     val mappedPercent: Float,
     val targetPercent: Float,
+    val currentPercent: Float?,
+    val deltaPercent: Float?,
+    val systemDelta: Int?,
     val canWriteByTime: Boolean,
+    val elapsedSinceLastWriteMillis: Long,
+    val minWriteIntervalMillis: Long,
+    val minPercentDelta: Float,
+    val minSystemDelta: Int,
     val shouldWrite: Boolean,
     val noWriteReason: NoWriteReason?
 )
 
 class BrightnessCurveEngine(
-    private val minWriteIntervalMillis: Long = 220L,
-    private val minPercentDelta: Float = 1f,
-    private val minSystemDelta: Int = 2,
+    val minWriteIntervalMillis: Long = 220L,
+    val minPercentDelta: Float = 1f,
+    val minSystemDelta: Int = 2,
     private val fastAlpha: Float = 0.65f,
     private val sharpChangeRatio: Float = 0.6f,
     private val sharpChangeLux: Float = 80f
@@ -71,8 +78,13 @@ class BrightnessCurveEngine(
             mappedPercent = mappedPercent,
             responseSpeed = responseSpeed
         )
-        val rampShouldWrite = shouldWriteByRamp(lastWrittenPercent, targetPercent)
-        val canWriteByTime = nowElapsedMillis - lastWriteElapsedMillis >= minWriteIntervalMillis
+        val deltaPercent = lastWrittenPercent?.let { targetPercent - it }
+        val systemDelta = lastWrittenPercent?.let {
+            abs(percentToSystemValue(targetPercent) - percentToSystemValue(it))
+        }
+        val rampShouldWrite = shouldWriteByRamp(deltaPercent, systemDelta)
+        val elapsedSinceLastWriteMillis = nowElapsedMillis - lastWriteElapsedMillis
+        val canWriteByTime = elapsedSinceLastWriteMillis >= minWriteIntervalMillis
         val shouldWrite = rampShouldWrite && canWriteByTime
         val noWriteReason = when {
             shouldWrite -> null
@@ -85,7 +97,14 @@ class BrightnessCurveEngine(
             smoothedLux = smoothedLux,
             mappedPercent = mappedPercent,
             targetPercent = targetPercent,
+            currentPercent = lastWrittenPercent,
+            deltaPercent = deltaPercent,
+            systemDelta = systemDelta,
             canWriteByTime = canWriteByTime,
+            elapsedSinceLastWriteMillis = elapsedSinceLastWriteMillis,
+            minWriteIntervalMillis = minWriteIntervalMillis,
+            minPercentDelta = minPercentDelta,
+            minSystemDelta = minSystemDelta,
             shouldWrite = shouldWrite,
             noWriteReason = noWriteReason
         )
@@ -102,10 +121,9 @@ class BrightnessCurveEngine(
         return previous + delta.coerceIn(-step, step)
     }
 
-    private fun shouldWriteByRamp(previousPercent: Float?, targetPercent: Float): Boolean {
-        val previous = previousPercent ?: return true
-        val systemDelta = abs(percentToSystemValue(targetPercent) - percentToSystemValue(previous))
-        return abs(targetPercent - previous) >= minPercentDelta && systemDelta >= minSystemDelta
+    private fun shouldWriteByRamp(deltaPercent: Float?, systemDelta: Int?): Boolean {
+        if (deltaPercent == null || systemDelta == null) return true
+        return abs(deltaPercent) >= minPercentDelta && systemDelta >= minSystemDelta
     }
 
     private fun isSharpChange(previous: Float, rawLux: Float): Boolean {

@@ -83,7 +83,7 @@ Capture-Adb -Name "brightness-before.txt" -Arguments @("shell", "settings", "lis
 Capture-Adb -Name "sensorservice.txt" -Arguments @("shell", "dumpsys", "sensorservice")
 Capture-Adb -Name "activity-services.txt" -Arguments @("shell", "dumpsys", "activity", "services", $PackageName)
 
-$logPattern = "BrightnessControlService|BrightnessController|LightSensorMonitor|MainViewModel|AndroidRuntime|FATAL EXCEPTION|$PackageName"
+$logPattern = "AutoBrightness|BrightnessControlService|BrightnessController|LightSensorMonitor|MainViewModel|AndroidRuntime|FATAL EXCEPTION|$PackageName"
 $logLines = Invoke-AdbText -Arguments @("logcat", "-d", "-t", $LogLines.ToString())
 $filteredLog = $logLines | Select-String -Pattern $logPattern | ForEach-Object { $_.ToString() }
 Write-TextFile -Name "logcat-filtered.txt" -Lines $filteredLog
